@@ -1,0 +1,23 @@
+version: '3.8'
+services:
+  payment-server:
+    build: .
+    ports:
+      - "127.0.0.1:3220:3220"
+    environment:
+      - PORT=3220
+      - LICENSE_SERVER_URL=http://license-server:3210
+      - LICENSE_ADMIN_KEY=${LICENSE_ADMIN_KEY}
+      - ALIPAY_APP_ID=${ALIPAY_APP_ID}
+      - ALIPAY_PRIVATE_KEY=${ALIPAY_PRIVATE_KEY}
+      - ALIPAY_ALIPAY_PUBLIC_KEY=${ALIPAY_ALIPAY_PUBLIC_KEY}
+      - ALIPAY_GATEWAY=${ALIPAY_GATEWAY:-https://openapi.alipay.com/gateway.do}
+      - ALIPAY_NOTIFY_URL=${ALIPAY_NOTIFY_URL}
+      - WECHAT_APP_ID=${WECHAT_APP_ID}
+      - WECHAT_MCH_ID=${WECHAT_MCH_ID}
+      - WECHAT_API_KEY=${WECHAT_API_KEY}
+      - WECHAT_NOTIFY_URL=${WECHAT_NOTIFY_URL}
+    volumes:
+      - ./data:/app/data
+    depends_on:
+      - license-server

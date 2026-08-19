@@ -1,0 +1,9 @@
+services:
+  license:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3210:3210"
+    env_file: .env
+    volumes:
+      - ./data:/app/data

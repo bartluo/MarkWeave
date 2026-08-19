@@ -1,0 +1,447 @@
+/* Common CSS use by both light and dark themes */
+:root {
+  --titleBarHeight: 32px;
+  --editorAreaWidth: 750px;
+
+  /*editor*/
+  /*Theme color cluster*/
+  --themeColor: #5b6ee1;
+  --themeColor90: rgba(91, 110, 225, 0.9);
+  --themeColor80: rgba(91, 110, 225, 0.8);
+  --themeColor70: rgba(91, 110, 225, 0.7);
+  --themeColor60: rgba(91, 110, 225, 0.6);
+  --themeColor50: rgba(91, 110, 225, 0.5);
+  --themeColor40: rgba(91, 110, 225, 0.4);
+  --themeColor30: rgba(91, 110, 225, 0.3);
+  --themeColor20: rgba(91, 110, 225, 0.2);
+  --themeColor10: rgba(91, 110, 225, 0.1);
+  --highlightThemeColor: var(--themeColor);
+
+  --highlightColor: rgba(91, 110, 225, 0.35);
+  --selectionColor: rgba(91, 110, 225, 0.2);
+  --editorColor: #4a4f57;
+  --editorColor80: #2c3138;
+  --editorColor60: #5f6672;
+  --editorColor50: #737a86;
+  --editorColor40: #8b919c;
+  --editorColor30: #a8adb8;
+  --editorColor10: #e4e6ea;
+  --editorColor04: #f4f5f7;
+  --editorBgColor: rgba(255, 255, 255, 1);
+  --deleteColor: #e5484d;
+  --iconColor: #6b737b;
+  --codeBgColor: rgba(0, 0, 0, 0.04);
+  --codeBlockBgColor: rgba(0, 0, 0, 0.03);
+  --footnoteBgColor: rgba(0, 0, 0, 0.03);
+  --inputBgColor: rgba(0, 0, 0, 0.05);
+  --focusColor: var(--themeColor);
+
+  --buttonFontColor: var(--editorColor);
+  --buttonBgColor: #ffffff;
+  --buttonBorder: 1px solid #e2e4e9;
+  --buttonShadow: none;
+  --buttonFontColorHover: var(--buttonFontColor);
+  --buttonBgColorHover: linear-gradient(#f9f9fa, #f3f4f6);
+  --buttonBorderHover: var(--buttonBorder);
+  --buttonFontColorActive: var(--buttonFontColor);
+  --buttonBgColorActive: #f0f1f3;
+  --buttonBorderActive: var(--buttonBorder);
+  --buttonFocusBorder: 1px solid var(--themeColor);
+
+  --buttonPrimaryFontColor: #ffffff;
+  --buttonPrimaryBgColor: var(--themeColor);
+  --buttonPrimaryBorder: none;
+  --buttonPrimaryShadow: 0 1px 2px rgba(0, 0, 0, 0.05), 0 4px 12px rgba(91, 110, 225, 0.25);
+  --buttonPrimaryFontColorHover: var(--buttonPrimaryFontColor);
+  --buttonPrimaryBgColorHover: #4d60d9;
+  --buttonPrimaryBorderHover: var(--buttonPrimaryBorder);
+  --buttonPrimaryFontColorActive: var(--buttonPrimaryFontColor);
+  --buttonPrimaryBgColorActive: #4759c7;
+  --buttonPrimaryBorderActive: var(--buttonPrimaryBorder);
+  --buttonPrimaryFocusBorder: none;
+  --buttonPrimaryFocusShadow: inset 0 0 0 1px rgba(24, 26, 31, 0.4), 0 0 0 1px var(--themeColor);
+  --tableBorderColor: #e5e7eb;
+
+  /* Markdown element colors */
+  --headingColor: var(--editorColor80);
+  --h1Color: var(--headingColor);
+  --h2Color: var(--headingColor);
+  --h3Color: var(--headingColor);
+  --h4Color: var(--headingColor);
+  --h5Color: var(--headingColor);
+  --h6Color: var(--headingColor);
+  --blockquoteTextColor: var(--editorColor50);
+  --blockquoteBorderColor: var(--themeColor);
+  --hrColor: var(--editorColor10);
+  --linkColor: var(--themeColor);
+  --strongColor: var(--editorColor);
+  --emColor: var(--editorColor);
+  --listMarkerColor: var(--editorColor50);
+
+  --sideBarColor: rgba(0, 0, 0, 0.6);
+  --sideBarIconColor: var(--iconColor);
+  --sideBarTitleColor: rgba(0, 0, 0, 0.9);
+  --sideBarTextColor: rgba(0, 0, 0, 0.45);
+  --sideBarBgColor: #f6f7f9;
+  --sideBarItemHoverBgColor: rgba(0, 0, 0, 0.05);
+  --itemBgColor: #eef0f3;
+
+  --floatFontColor: rgba(0, 0, 0, 0.65);
+  --floatBgColor: #fff;
+  --floatHoverColor: rgba(0, 0, 0, 0.04);
+  --floatBorderColor: rgba(0, 0, 0, 0.08);
+  --floatShadow:
+    rgba(15, 15, 15, 0.04) 0px 1px 2px, rgba(15, 15, 15, 0.05) 0px 4px 12px,
+    rgba(15, 15, 15, 0.06) 0px 12px 32px;
+  --maskColor: rgba(232, 232, 232, 0.8);
+
+  /* Notification colors */
+  --notificationPrimaryColor: #ffffff;
+  --notificationPrimaryBg: var(--themeColor);
+  --notificationInfoColor: #ffffff;
+  --notificationInfoBg: #909399;
+  --notificationWarningColor: #ffffff;
+  --notificationWarningBg: #ff8800;
+  --notificationErrorColor: #ffffff;
+  --notificationErrorBg: #e5484d;
+}
+
+::-webkit-scrollbar,
+::-webkit-scrollbar-corner {
+  background: var(--floatHoverColor);
+}
+
+::-webkit-scrollbar:vertical {
+  width: 10px;
+}
+
+::-webkit-scrollbar:horizontal {
+  height: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--editorColor30);
+  border-radius: 5px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--editorColor50);
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+:focus {
+  outline: none;
+}
+
+:focus-visible {
+  outline: 2px solid var(--themeColor60);
+  outline-offset: 1px;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: transparent !important;
+  caret-color: var(--editorColor);
+}
+
+body {
+  position: fixed;
+  width: 100vw;
+  height: 100vh;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+}
+
+.icon {
+  width: 1em;
+  height: 1em;
+  vertical-align: -0.15em;
+  fill: currentColor;
+  overflow: hidden;
+}
+
+.text-overflow {
+  text-overflow: ellipsis;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+/* Overwrite Element style */
+.el-tooltip__popper {
+  background: var(--floatBgColor);
+  color: var(--sideBarColor);
+  box-shadow: 0 4px 8px 0 var(--floatBorderColor);
+  border: solid 1px var(--floatBorderColor);
+}
+
+.el-tooltip__popper[data-popper-placement^='left'] .popper__arrow {
+  border-left-color: #303133;
+}
+.el-tooltip__popper[data-popper-placement^='top'] .popper__arrow {
+  border-top-color: #303133;
+}
+.el-tooltip__popper[data-popper-placement^='right'] .popper__arrow {
+  border-right-color: #303133;
+}
+.el-tooltip__popper[data-popper-placement^='bottom'] .popper__arrow {
+  border-bottom-color: #303133;
+}
+
+.el-button:hover,
+.el-button--primary:hover {
+  border-color: unset;
+}
+.el-button:active,
+.el-button--primary:active {
+  border-color: unset;
+}
+.el-button:focus,
+.el-button--primary:focus {
+  border-color: unset;
+}
+
+.el-slider__button {
+  border-color: var(--themeColor);
+}
+
+.el-slider__bar {
+  background-color: var(--themeColor);
+}
+
+.el-radio__input.is-checked .el-radio__inner {
+  border-color: var(--themeColor);
+  background-color: var(--themeColor);
+}
+
+.el-radio__input.is-checked + .el-radio__label {
+  color: var(--editorColor);
+}
+
+.el-dialog,
+.el-dialog.ag-dialog-table {
+  border-radius: 14px;
+  box-shadow: 0 4px 12px 0 var(--floatBorderColor), 0 24px 64px rgba(0, 0, 0, 0.08);
+  border: solid 1px var(--floatBorderColor);
+  background-color: var(--floatBgColor);
+}
+.el-dialog__header {
+  position: relative;
+  display: block;
+  padding: 8px 6px;
+}
+
+input.el-input__inner {
+  background: var(--inputBgColor);
+  border: 1px solid var(--editorColor10);
+  border-radius: 8px;
+  color: var(--editorColor80);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.el-input.is-focus .el-input__wrapper,
+.el-input__wrapper.is-focus {
+  box-shadow: 0 0 0 1px var(--themeColor) inset;
+}
+
+.el-input-number.is-controls-right span.el-input-number__decrease,
+.el-input-number.is-controls-right span.el-input-number__increase {
+  background: var(--buttonBgColor);
+  border-left: none;
+  color: var(--editorColor80);
+}
+
+.el-input-number.is-controls-right span.el-input-number__increase {
+  border-bottom: none;
+}
+
+.el-tabs__nav-wrap::after {
+  background: var(--editorColor04);
+}
+
+div.el-tabs__item {
+  color: var(--editorColor);
+}
+
+div.el-tab-pane {
+  color: var(--editorColor);
+  font-size: 14px;
+}
+
+.ag-dialog-table .dialog-title svg {
+  width: 1.5em;
+  height: 1.5em;
+}
+
+.ag-underdevelop {
+  opacity: 0.3;
+  pointer-events: none;
+  cursor: not-allowed;
+}
+
+.button,
+.muya-button,
+.el-button {
+  cursor: pointer;
+  text-decoration: none;
+  color: var(--buttonFontColor);
+  background: var(--buttonBgColor);
+  border: var(--buttonBorder);
+  border-radius: 8px;
+  box-shadow: var(--buttonShadow);
+  padding: 7px 14px;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+.button:hover,
+.muya-button:hover,
+.el-button:hover {
+  color: var(--buttonFontColorHover);
+  background: var(--buttonBgColorHover);
+  border: var(--buttonBorderHover);
+}
+.button:active,
+.muya-button:active,
+.el-button:active {
+  color: var(--buttonFontColorActive);
+  background: var(--buttonBgColorActive);
+  border: var(--buttonBorderActive);
+}
+.button:focus,
+.muya-button:focus,
+.el-button:focus {
+  outline: none;
+  border: var(--buttonFocusBorder);
+}
+
+.button-primary,
+.muya-button-primary,
+.el-button--primary {
+  cursor: pointer;
+  text-decoration: none;
+  color: var(--buttonPrimaryFontColor);
+  background: var(--buttonPrimaryBgColor);
+  border: var(--buttonPrimaryBorder);
+  border-radius: 8px;
+  box-shadow: var(--buttonPrimaryShadow);
+  padding: 7px 14px;
+  transition: background-color 0.15s ease, box-shadow 0.15s ease;
+}
+.button-primary:hover,
+.muya-button-primary:hover,
+.el-button--primary:hover {
+  color: var(--buttonPrimaryFontColorHover);
+  background: var(--buttonPrimaryBgColorHover);
+  border: var(--buttonPrimaryBorderHover);
+}
+.button-primary:active,
+.muya-button-primary:active,
+.el-button--primary:active {
+  color: var(--buttonPrimaryFontColorActive);
+  background: var(--buttonPrimaryBgColorActive);
+  border: var(--buttonPrimaryBorderActive);
+}
+button.button-primary:not(.custom):focus,
+.button-primary:focus,
+.muya-button-primary:focus,
+.el-button--primary:focus {
+  outline: none;
+  border: var(--buttonPrimaryFocusBorder);
+  box-shadow: var(--buttonPrimaryFocusShadow);
+}
+
+.button.disabled,
+.button[disabled],
+.muya-button.disabled,
+.muya-button[disabled],
+.el-button.disabled,
+.el-button[disabled],
+.button-primary.disabled,
+.button-primary[disabled],
+.el-button--primary.disabled,
+.el-button--primary[disabled] {
+  cursor: not-allowed !important;
+  opacity: 0.65 !important;
+  box-shadow: none !important;
+}
+
+.button.small,
+.muya-button.small,
+.el-button.small,
+.button-primary.small,
+.muya-button-primary.small,
+.el-button--primary.small {
+  padding: 5px 8px;
+}
+.button.tiny,
+.muya-button.tiny,
+.el-button.tiny,
+.button-primary.tiny,
+.muya-button-primary.tiny,
+.el-button--primary.tiny {
+  font-size: 13px;
+  padding: 4px 7px;
+}
+
+.button-group {
+  /* Remove space between buttons */
+  font-size: 0;
+}
+.button-group > button:first-child:not(:last-child) {
+  border-bottom-right-radius: 0;
+  border-top-right-radius: 0;
+  margin-left: 0;
+  border-right: none;
+}
+.button-group > button:not(:first-child):not(:last-child) {
+  border-radius: 0;
+  margin-left: 0;
+  margin-right: 0;
+  border-right: none;
+}
+.button-group > button:last-child:not(:first-child) {
+  border-bottom-left-radius: 0;
+  border-top-left-radius: 0;
+  margin-right: 0;
+}
+
+/* Overwrite element UI button padding */
+.el-button,
+.el-button--primary {
+  padding: 7px 14px;
+}
+.el-button:focus {
+  background-color: var(--buttonBgColor);
+}
+.el-button--primary:focus {
+  background-color: var(--buttonPrimaryBgColor);
+}
+.el-button.is-disabled,
+.el-button.is-disabled:focus,
+.el-button.is-disabled:hover {
+  color: var(--buttonFontColor);
+  background: var(--buttonBgColor);
+  border: var(--buttonBorder);
+  box-shadow: none;
+}
+.el-button--primary.is-disabled,
+.el-button--primary.is-disabled:focus,
+.el-button--primary.is-disabled:hover {
+  color: var(--buttonPrimaryFontColor);
+  background: var(--buttonPrimaryBgColor);
+  border: var(--buttonPrimaryBorder);
+  box-shadow: none;
+}
+
+.image-viewer {
+  z-index: 10001;
+}
+
+.el-tabs__active-bar {
+  background-color: var(--themeColor);
+}

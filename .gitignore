@@ -1,0 +1,26 @@
+node_modules
+packages/*/node_modules
+dist
+out
+packages/*/out
+packages/*/dist
+.DS_Store
+.eslintcache
+*.log*
+.trae/
+.cursor/
+doc/
+# Ignore temp artifacts
+temp/
+logs/
+test-results/
+playwright-report/
+*.min.json
+.claude/settings.local.json
+.claude/
+.agents/
+.agent/
+# License signing keys — never commit private keys
+packages/license-server/data/*.pem
+packages/license-server/data/.gitkeep
+*.pem

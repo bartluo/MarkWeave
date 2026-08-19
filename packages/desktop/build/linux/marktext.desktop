@@ -1,0 +1,17 @@
+[Desktop Entry]
+Name=MarkWeave
+Comment=Next generation markdown editor
+Exec=markweave %F
+Terminal=false
+Type=Application
+Icon=markweave
+Categories=Office;TextEditor;Utility;
+MimeType=text/markdown;
+Keywords=markweave;
+StartupWMClass=markweave
+Actions=NewWindow;
+
+[Desktop Action NewWindow]
+Name=New Window
+Exec=markweave --new-window %F
+Icon=markweave
