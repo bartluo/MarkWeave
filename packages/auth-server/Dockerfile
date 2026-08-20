@@ -4,7 +4,8 @@
 FROM node:22-alpine
 
 # better-sqlite3 falls back to node-gyp when no prebuilt binary exists
-RUN apk add --no-cache python3 make g++
+RUN sed -i 's#https://dl-cdn.alpinelinux.org#https://mirrors.aliyun.com#g' /etc/apk/repositories \
+  && apk add --no-cache python3 make g++ curl
 RUN corepack enable
 
 WORKDIR /app
@@ -17,8 +18,13 @@ COPY packages/auth-server/package.json packages/auth-server/
 # Install only the auth-server dependency tree. --ignore-scripts skips the
 # root postinstall (Electron download + desktop native rebuilds); the only
 # native module this server needs is better-sqlite3, rebuilt explicitly.
-RUN pnpm install --frozen-lockfile --ignore-scripts --filter @markweave/auth-server... \
-  && pnpm rebuild better-sqlite3
+RUN NODE_VERSION=$(node -p 'process.versions.node') \
+  && mkdir -p /root/.cache/node-gyp/$NODE_VERSION \
+  && curl -fsSL https://nodejs.org/download/release/v$NODE_VERSION/node-v$NODE_VERSION-headers.tar.gz \
+    | tar -xz -C /root/.cache/node-gyp/$NODE_VERSION --strip-components=1 \
+  && pnpm install --frozen-lockfile --ignore-scripts --registry=https://registry.npmmirror.com --filter @markweave/auth-server... \
+  && npm_config_build_from_source=true npm_config_nodedir=/root/.cache/node-gyp/$NODE_VERSION \
+    pnpm --filter @markweave/auth-server rebuild better-sqlite3
 
 COPY packages/license-core packages/license-core
 COPY packages/auth-server packages/auth-server

@@ -8,8 +8,9 @@ WORKDIR /app
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml .npmrc ./
 COPY packages/website/package.json packages/website/
 
-RUN pnpm install --frozen-lockfile --ignore-scripts --filter markweave-website... \
-  && pnpm rebuild esbuild
+RUN pnpm install --frozen-lockfile --ignore-scripts --registry=https://registry.npmmirror.com --filter markweave-website... \
+  && pnpm rebuild esbuild \
+  && pnpm rebuild workerd
 
 COPY packages/website packages/website
 RUN pnpm --filter markweave-website build
@@ -22,6 +23,7 @@ ENV HOSTNAME=0.0.0.0
 ENV PORT=3000
 
 COPY --from=builder /app/packages/website/.next/standalone/packages/website ./
+COPY --from=builder /app/packages/website/.next/standalone/node_modules /app/node_modules
 COPY --from=builder /app/packages/website/.next/static ./.next/static
 COPY --from=builder /app/packages/website/public ./public
 

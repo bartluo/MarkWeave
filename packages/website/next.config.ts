@@ -19,6 +19,8 @@ const config: NextConfig = {
   // the templating layer entirely.
 }
 
-initOpenNextCloudflareForDev()
+if (process.env.NEXT_PHASE === 'phase-development-server') {
+  initOpenNextCloudflareForDev()
+}
 
 export default config

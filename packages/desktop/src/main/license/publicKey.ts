@@ -4,8 +4,8 @@
 // 生成方式：license-server 首次启动（无私钥时）会打印新公钥，替换下方分段即可。
 const _pkChunks = [
   'QYDNVygwBoCM', // 反向存储段（示例）：运行时重组
-  'MCowBQYDK2VwAyEA7rSzMIZgDh4kiBkK',
-  '++SKE2dsWc4ushY4o7Ra1mulnNo='
+  'MCowBQYDK2VwAyEA4OWycSltYXAmBIfdIunBZpNK',
+  '398C74NLxbRsaDa5Tqc='
 ]
 
 const _deobfuscate = (): string => {
