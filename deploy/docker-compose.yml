@@ -1,0 +1,95 @@
+name: markweave
+
+services:
+  auth-server:
+    build:
+      context: ..
+      dockerfile: packages/auth-server/Dockerfile
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:13230:3230"
+    environment:
+      AUTH_SERVER_PORT: 3230
+      JWT_SECRET: ${JWT_SECRET}
+      AUTH_ADMIN_KEY: ${AUTH_ADMIN_KEY}
+      AUTH_DB_PATH: /app/packages/auth-server/data/auth.db
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID:-}
+      GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET:-}
+    volumes:
+      - auth-data:/app/packages/auth-server/data
+
+  license-server:
+    build:
+      context: ..
+      dockerfile: packages/license-server/Dockerfile
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:13210:3210"
+    environment:
+      PORT: 3210
+      LICENSE_DB_PATH: /app/packages/license-server/data/license.db
+      LICENSE_PRIVATE_KEY_PATH: /app/packages/license-server/data/license-private.pem
+      LICENSE_PRIVATE_KEY: ${LICENSE_PRIVATE_KEY:-}
+      LICENSE_ADMIN_KEY: ${LICENSE_ADMIN_KEY}
+      TRUST_PROXY: "true"
+    volumes:
+      - license-data:/app/packages/license-server/data
+
+  payment-server:
+    build:
+      context: ..
+      dockerfile: packages/payment-server/Dockerfile
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:13220:3220"
+    environment:
+      PORT: 3220
+      PAYMENT_DB_PATH: /app/packages/payment-server/data/payment.db
+      LICENSE_SERVER_URL: http://license-server:3210
+      LICENSE_ADMIN_KEY: ${LICENSE_ADMIN_KEY}
+      AUTH_SERVER_URL: http://auth-server:3230
+      AUTH_ADMIN_KEY: ${AUTH_ADMIN_KEY}
+      TRUST_PROXY: "true"
+      ALIPAY_APP_ID: ${ALIPAY_APP_ID:-}
+      ALIPAY_PRIVATE_KEY: ${ALIPAY_PRIVATE_KEY:-}
+      ALIPAY_ALIPAY_PUBLIC_KEY: ${ALIPAY_ALIPAY_PUBLIC_KEY:-}
+      ALIPAY_GATEWAY: ${ALIPAY_GATEWAY:-https://openapi.alipay.com/gateway.do}
+      ALIPAY_NOTIFY_URL: ${ALIPAY_NOTIFY_URL:-https://pay.markweave.cloud/v1/webhooks/alipay}
+      WECHAT_APP_ID: ${WECHAT_APP_ID:-}
+      WECHAT_MCH_ID: ${WECHAT_MCH_ID:-}
+      WECHAT_API_KEY: ${WECHAT_API_KEY:-}
+      WECHAT_NOTIFY_URL: ${WECHAT_NOTIFY_URL:-https://pay.markweave.cloud/v1/webhooks/wechat}
+      WECHAT_CERT_PRIVATE_KEY_PATH: ${WECHAT_CERT_PRIVATE_KEY_PATH:-}
+      CREEM_API_KEY: ${CREEM_API_KEY:-}
+      CREEM_WEBHOOK_SECRET: ${CREEM_WEBHOOK_SECRET:-}
+      CREEM_SERVER: ${CREEM_SERVER:-prod}
+      CREEM_PRODUCT_PRO: ${CREEM_PRODUCT_PRO:-}
+      CREEM_PRODUCT_COMMERCIAL: ${CREEM_PRODUCT_COMMERCIAL:-}
+      CREEM_PRODUCT_TRIAL: ${CREEM_PRODUCT_TRIAL:-}
+    volumes:
+      - payment-data:/app/packages/payment-server/data
+    depends_on:
+      - license-server
+      - auth-server
+
+  website:
+    build:
+      context: ..
+      dockerfile: packages/website/Dockerfile
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:13000:3000"
+    environment:
+      NODE_ENV: production
+      HOSTNAME: 0.0.0.0
+      PORT: 3000
+      PAYMENT_API_URL: http://payment-server:3220
+    depends_on:
+      - payment-server
+
+volumes:
+  auth-data:
+  license-data:
+  payment-data:
