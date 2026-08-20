@@ -25,13 +25,20 @@ export const useLicenseStore = defineStore('license', {
   actions: {
     async init(): Promise<void> {
       if (!window.license) return
-      this.state = await window.license.getState()
+      try {
+        this.state = await window.license.getState()
+      } catch (e) {
+        // 初始化失败不能阻断应用启动（app.vue 的 onMounted 会 await 本方法）
+        console.error('license init failed:', e)
+        this.error = 'INIT_FAILED'
+        return
+      }
       window.license.onStateChanged((next) => {
         this.state = next
         this.error = null
         void this.syncFeatures()
       })
-      if (this.state.status === 'activated') {
+      if (this.state?.status === 'activated') {
         await this.refresh()
       }
       await this.syncFeatures()
@@ -39,10 +46,15 @@ export const useLicenseStore = defineStore('license', {
 
     async syncFeatures(): Promise<void> {
       if (!window.license) return
-      this.features = {
-        proExport: await window.license.hasFeature('proExport'),
-        premiumThemes: await window.license.hasFeature('premiumThemes'),
-        cloudSync: await window.license.hasFeature('cloudSync')
+      try {
+        this.features = {
+          proExport: await window.license.hasFeature('proExport'),
+          premiumThemes: await window.license.hasFeature('premiumThemes'),
+          cloudSync: await window.license.hasFeature('cloudSync')
+        }
+      } catch (e) {
+        console.error('license syncFeatures failed:', e)
+        return
       }
       // 防盗版：根据授权情况解锁/锁定 premium 主题
       setPremiumThemesEnabled(this.features.premiumThemes)
@@ -50,7 +62,13 @@ export const useLicenseStore = defineStore('license', {
 
     async refresh(): Promise<void> {
       if (!window.license) return
-      this.state = await window.license.refresh()
+      try {
+        this.state = await window.license.refresh()
+      } catch (e) {
+        // 刷新失败（如网络不可达）不应抛出：调用方多在启动路径上
+        console.error('license refresh failed:', e)
+        return
+      }
       await this.syncFeatures()
     },
 
@@ -67,6 +85,10 @@ export const useLicenseStore = defineStore('license', {
         this.state = res.state ?? null
         await this.syncFeatures()
         return true
+      } catch (e) {
+        console.error('license activate failed:', e)
+        this.error = 'SERVER'
+        return false
       } finally {
         this.loading = false
       }
@@ -74,7 +96,12 @@ export const useLicenseStore = defineStore('license', {
 
     async deactivate(): Promise<void> {
       if (!window.license) return
-      await window.license.deactivate()
+      try {
+        await window.license.deactivate()
+      } catch (e) {
+        console.error('license deactivate failed:', e)
+        return
+      }
       this.state = null
       await this.syncFeatures()
     }

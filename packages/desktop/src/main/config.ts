@@ -5,6 +5,13 @@ export const isOsx: boolean = process.platform === 'darwin'
 export const isWindows: boolean = process.platform === 'win32'
 export const isLinux: boolean = process.platform === 'linux'
 
+// In development the renderer is served from `http://localhost` while local
+// images are still `file://`, so same-origin policy must be relaxed to render
+// them. In production the app itself is loaded from `file://`, so local images
+// load fine with web security enabled — keep it on there to reduce the blast
+// radius of any renderer compromise.
+const isDev: boolean = process.env.NODE_ENV === 'development'
+
 export const editorWinOptions: Readonly<BrowserWindowConstructorOptions> = Object.freeze({
   minWidth: 550,
   minHeight: 350,
@@ -16,7 +23,7 @@ export const editorWinOptions: Readonly<BrowserWindowConstructorOptions> = Objec
     // enable it always and set the HTML spelling attribute to false.
     spellcheck: true,
     nodeIntegration: false,
-    webSecurity: false,
+    webSecurity: isDev,
     preload: path.join(__dirname, '../preload/index.js')
   },
   useContentSize: true,
@@ -37,7 +44,7 @@ export const preferencesWinOptions: Readonly<BrowserWindowConstructorOptions> = 
     // Always true to access native spellchecker.
     spellcheck: true,
     nodeIntegration: false,
-    webSecurity: false,
+    webSecurity: isDev,
     preload: path.join(__dirname, '../preload/index.js')
   },
   fullscreenable: false,

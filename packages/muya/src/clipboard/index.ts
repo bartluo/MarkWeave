@@ -100,8 +100,15 @@ class Clipboard {
         };
 
         const pasteHandler = (event: Event) => {
-            if (ownsEvent() && isClipboardEvent(event))
-                this.pasteHandler(event);
+            if (!ownsEvent() || !isClipboardEvent(event))
+                return;
+            // The paste pipeline is async (image hook, HTML normalization).
+            // Catch rejections here — otherwise a failure deep in the pipeline
+            // surfaces only as an unhandled promise rejection and the editor
+            // silently loses the paste.
+            this.pasteHandler(event).catch((err) => {
+                console.error('[muya] paste failed:', err);
+            });
         };
 
         const { eventCenter } = this.muya;

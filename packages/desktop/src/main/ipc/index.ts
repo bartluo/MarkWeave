@@ -12,12 +12,14 @@ import { registerLicenseHandlers } from './license'
 import { registerPaymentHandlers } from './payment'
 import { registerAuthHandlers } from './auth'
 
-export const registerSandboxIpcHandlers = (): void => {
+export const registerSandboxIpcHandlers = (
+  getUploaderPreferences?: () => { currentUploader: string; cliScript: string }
+): void => {
   registerBootInfo()
   registerFsHandlers()
   registerPathHandlers()
   registerRipgrepHandlers()
-  registerUploaderHandlers()
+  registerUploaderHandlers(getUploaderPreferences)
   registerFontsHandlers()
   registerShellHandlers()
   registerWindowHandlers()

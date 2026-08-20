@@ -1,7 +1,5 @@
 export const DOWNLOAD = {
-  mac: 'https://github.com/markweave/markweave/releases/latest/download/markweave-x64.dmg',
-  windows: 'https://github.com/markweave/markweave/releases/latest/download/markweave-setup.exe',
-  linux: 'https://github.com/markweave/markweave/releases/latest/download/markweave-x86_64.AppImage',
+  latest: 'https://github.com/markweave/markweave/releases/latest',
   releases: 'https://github.com/markweave/markweave/releases',
   repo: 'https://github.com/markweave/markweave',
   contributing: 'https://github.com/markweave/markweave/blob/develop/.github/CONTRIBUTING.md',

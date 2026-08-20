@@ -38,17 +38,128 @@ const send = <K extends keyof IpcSendChannels>(channel: K, ...args: IpcSendChann
 // without an `await` from inside Vue computed properties etc.
 const bootInfo = ipcRenderer.sendSync('mt::boot-info') as BootInfo | undefined
 
+// ── Runtime IPC channel allowlist ──────────────────────────────────────────
+// The typed generics below only enforce channel names at *compile* time. A
+// compromised renderer (e.g. via an XSS in rendered Markdown) could still call
+// `window.electron.ipcRenderer.invoke('<anything>')` at runtime and reach any
+// handler registered in the main process. These sets mirror the contract in
+// `@shared/types/ipc` and are checked on every call so only known channels are
+// forwarded. Keep them in sync when adding channels to `@shared/types/ipc`.
+const INVOKE_CHANNELS: ReadonlySet<string> = new Set([
+  'mt::ask-for-image-path', 'mt::boot-info-async', 'mt::clipboard::guess-file-path',
+  'mt::clipboard::read-text', 'mt::cmd::exists', 'mt::fonts::list', 'mt::fs-trash-item',
+  'mt::fs::copy', 'mt::fs::empty-dir', 'mt::fs::ensure-dir', 'mt::fs::is-directory',
+  'mt::fs::is-executable', 'mt::fs::is-file', 'mt::fs::move', 'mt::fs::output-file',
+  'mt::fs::path-exists', 'mt::fs::read-file', 'mt::fs::readdir', 'mt::fs::stat',
+  'mt::fs::unlink', 'mt::fs::write-file', 'mt::i18n::is-supported', 'mt::i18n::load',
+  'mt::i18n::supported', 'mt::keybinding-get-keyboard-info', 'mt::keybinding-get-pref-keybindings',
+  'mt::keybinding-save-user-keybindings', 'mt::license::activate', 'mt::license::deactivate',
+  'mt::license::get-state', 'mt::license::has-feature', 'mt::license::refresh',
+  'mt::payment::checkout', 'mt::payment::get-order', 'mt::payment::get-plans',
+  'mt::auth::get-status', 'mt::auth::login', 'mt::auth::register', 'mt::auth::logout',
+  'mt::auth::refresh-token', 'mt::auth::get-profile', 'mt::auth::get-devices',
+  'mt::auth::activate-device', 'mt::auth::deactivate-device', 'mt::auth::link-account',
+  'mt::auth::migrate-license', 'mt::auth::start-oauth', 'mt::auth::oauth-callback',
+  'mt::auth::get-subscription', 'mt::auth::create-subscription', 'mt::auth::get-coupon',
+  'mt::auth::create-team', 'mt::auth::get-team', 'mt::auth::invite-team-member',
+  'mt::auth::accept-team-invite', 'mt::auth::get-referral', 'mt::auth::convert-referral',
+  'mt::auth::get-notifications', 'mt::auth::get-unread-notification-count',
+  'mt::auth::mark-notification-read', 'mt::auth::log-analytics', 'mt::paths::is-image',
+  'mt::rg::start', 'mt::shell::open-external', 'mt::shell::open-path',
+  'mt::spellchecker-get-available-dictionaries', 'mt::spellchecker-get-custom-dictionary-words',
+  'mt::spellchecker-remove-word', 'mt::spellchecker-set-enabled', 'mt::spellchecker-switch-language',
+  'mt::uploader::upload', 'mt::win::is-fullscreen', 'mt::win::is-maximized', 'update-buffer-state'
+])
+
+const SEND_CHANNELS: ReadonlySet<string> = new Set([
+  'app-create-editor-window', 'app-create-settings-window', 'app-open-directory-by-id',
+  'app-open-file-by-id', 'app-open-files-by-id', 'app-open-markdown-by-id',
+  'broadcast-preferences-changed', 'broadcast-user-data-changed', 'menu-add-recently-used',
+  'menu-clear-recently-used', 'mt::NEED_UPDATE', 'mt::add-recently-used-document',
+  'mt::app-try-quit', 'mt::ask-for-image-auto-path', 'mt::ask-for-modify-image-folder-path',
+  'mt::ask-for-open-project-in-sidebar', 'mt::ask-for-user-data', 'mt::ask-for-user-preference',
+  'mt::check-for-update', 'mt::clipboard::write-text', 'mt::close-window',
+  'mt::close-window-confirm', 'mt::cmd-close-window', 'mt::cmd-import-file',
+  'mt::cmd-new-editor-window', 'mt::cmd-open-file', 'mt::cmd-open-folder',
+  'mt::cmd-toggle-autosave', 'mt::editor-selection-changed', 'mt::format-link-click',
+  'mt::get-current-language', 'mt::handle-renderer-error', 'mt::keybinding-debug-dump-keyboard-info',
+  'mt::make-screenshot', 'mt::menu::popup', 'mt::menu::popup-application', 'mt::open-file',
+  'mt::open-file-by-window-id', 'mt::open-keybindings-config', 'mt::open-setting-window',
+  'mt::rename', 'mt::request-keybindings', 'mt::set-editor-format-menus-enabled',
+  'mt::response-export', 'mt::response-file-move-to', 'mt::response-file-save',
+  'mt::response-file-save-as', 'mt::response-print', 'mt::rg::cancel',
+  'mt::save-and-close-tabs', 'mt::save-tabs', 'mt::select-default-directory-to-open',
+  'mt::set-user-data', 'mt::set-user-preference', 'mt::shell::open-external',
+  'mt::shell::show-item', 'mt::update-format-menu', 'mt::update-line-ending-menu',
+  'mt::update-sidebar-menu', 'mt::view-layout-changed', 'mt::win::close', 'mt::win::maximize',
+  'mt::win::minimize', 'mt::win::set-fullscreen', 'mt::win::toggle-fullscreen',
+  'mt::win::toggle-maximize', 'mt::win::unmaximize', 'mt::window-add-file-path',
+  'mt::window-initialized', 'mt::window-tab-closed', 'mt::window-toggle-always-on-top',
+  'mt::window::drop', 'screen-capture', 'set-image-folder-path', 'set-user-preference',
+  'watcher-unwatch-all-by-id', 'watcher-unwatch-directory', 'watcher-unwatch-file',
+  'watcher-watch-directory', 'watcher-watch-file', 'window-add-file-path',
+  'window-change-file-path', 'window-close-by-id', 'window-file-saved',
+  'window-reload-by-id', 'window-toggle-always-on-top'
+])
+
+const SYNC_CHANNELS: ReadonlySet<string> = new Set([
+  'mt::boot-info',
+  'mt::paths::is-same-sync'
+])
+
+const EVENT_CHANNELS: ReadonlySet<string> = new Set([
+  'language-changed', 'mt::UPDATE_AVAILABLE', 'mt::UPDATE_DOWNLOADED', 'mt::UPDATE_ERROR',
+  'mt::UPDATE_NOT_AVAILABLE', 'mt::about-dialog', 'mt::ask-for-close', 'mt::bootstrap-editor',
+  'mt::cm-copy-as-html', 'mt::cm-copy-as-rich', 'mt::cm-insert-paragraph',
+  'mt::cm-paste-as-plain-text', 'mt::current-language', 'mt::editor-ask-file-save',
+  'mt::editor-ask-file-save-as', 'mt::editor-close-tab', 'mt::editor-edit-action',
+  'mt::editor-format-action', 'mt::editor-move-file', 'mt::editor-paragraph-action',
+  'mt::editor-rename-file', 'mt::execute-command-by-id', 'mt::export-success', 'mt::file-saved',
+  'mt::force-close-tabs-by-id', 'mt::invalidate-image-cache', 'mt::keybindings-response',
+  'mt::license::state-changed', 'mt::auth::state-changed', 'mt::load-state', 'mt::menu::click',
+  'mt::menu::closed', 'mt::new-untitled-tab', 'mt::open-directory', 'mt::open-new-tab',
+  'mt::pandoc-not-exists', 'mt::print-service-clearup', 'mt::rg::cancelled', 'mt::rg::done',
+  'mt::rg::error', 'mt::rg::match', 'mt::rg::progress', 'mt::screenshot-captured',
+  'mt::set-line-ending', 'mt::set-pathname', 'mt::set-view-layout', 'mt::show-command-palette',
+  'mt::show-export-dialog', 'mt::show-notification', 'mt::spelling-replace-misspelling',
+  'mt::spelling-show-switch-language', 'mt::switch-tab-by-file_path', 'mt::switch-tab-by-index',
+  'mt::tab-save-failure', 'mt::tab-saved', 'mt::tabs-cycle-left', 'mt::tabs-cycle-right',
+  'mt::toggle-view-layout-entry', 'mt::toggle-view-mode-entry', 'mt::update-file',
+  'mt::update-object-tree', 'mt::user-preference', 'mt::window-active-status',
+  'mt::window-enter-full-screen', 'mt::window-leave-full-screen', 'mt::window-maximize',
+  'mt::window-unmaximize', 'mt::window-zoom', 'settings::change-tab'
+])
+
+const assertChannel = (allowed: ReadonlySet<string>, channel: string, kind: string): void => {
+  if (typeof channel !== 'string' || !allowed.has(channel)) {
+    throw new Error(`[preload] blocked ${kind} on non-allowlisted IPC channel: ${String(channel)}`)
+  }
+}
+
 const ipcWrapper = {
-  send,
+  send: <K extends keyof IpcSendChannels>(channel: K, ...args: IpcSendChannels[K]): void => {
+    assertChannel(SEND_CHANNELS, channel as string, 'send')
+    send(channel, ...args)
+  },
   sendSync: <K extends keyof IpcSyncChannels>(
     channel: K,
     ...args: IpcSyncChannels[K]['args']
-  ): IpcSyncChannels[K]['ret'] => ipcRenderer.sendSync(channel, ...args),
-  invoke,
+  ): IpcSyncChannels[K]['ret'] => {
+    assertChannel(SYNC_CHANNELS, channel as string, 'sendSync')
+    return ipcRenderer.sendSync(channel, ...args)
+  },
+  invoke: <K extends keyof IpcInvokeChannels>(
+    channel: K,
+    ...args: IpcInvokeChannels[K]['args']
+  ): Promise<IpcInvokeChannels[K]['ret']> => {
+    assertChannel(INVOKE_CHANNELS, channel as string, 'invoke')
+    return invoke(channel, ...args)
+  },
   on: <K extends keyof IpcMainEventChannels>(
     channel: K,
     listener: RendererEventListener<K>
   ): (() => void) => {
+    assertChannel(EVENT_CHANNELS, channel as string, 'on')
     const subscription = (event: IpcRendererEvent, ...args: unknown[]): void => {
       listener(event, ...(args as IpcMainEventChannels[K]))
     }
@@ -59,6 +170,7 @@ const ipcWrapper = {
     channel: K,
     listener: RendererEventListener<K>
   ): (() => void) => {
+    assertChannel(EVENT_CHANNELS, channel as string, 'once')
     const subscription = (event: IpcRendererEvent, ...args: unknown[]): void => {
       listener(event, ...(args as IpcMainEventChannels[K]))
     }
@@ -66,6 +178,8 @@ const ipcWrapper = {
     return () => ipcRenderer.removeListener(channel, subscription)
   },
   removeAllListeners: (channel: keyof IpcMainEventChannels | string): void => {
+    // Only allow clearing listeners for known push-event channels.
+    assertChannel(EVENT_CHANNELS, channel as string, 'removeAllListeners')
     ipcRenderer.removeAllListeners(channel as string)
   }
 }
@@ -340,33 +454,20 @@ const processShim = {
 }
 
 try {
-  console.log('[preload] exposing electron API')
   contextBridge.exposeInMainWorld('electron', electronAPI)
-  console.log('[preload] exposing process shim')
   contextBridge.exposeInMainWorld('process', processShim)
-  console.log('[preload] exposing rgPath')
   contextBridge.exposeInMainWorld('rgPath', bootInfo?.paths?.ripgrepBinary || '')
-  console.log('[preload] exposing fileUtils')
   contextBridge.exposeInMainWorld('fileUtils', fileUtilsAPI)
-  console.log('[preload] exposing path')
   contextBridge.exposeInMainWorld('path', pathAPI)
-  console.log('[preload] exposing commandExists')
   contextBridge.exposeInMainWorld('commandExists', commandAPI)
-  console.log('[preload] exposing i18nUtils')
   contextBridge.exposeInMainWorld('i18nUtils', i18nAPI)
-  console.log('[preload] exposing ripgrep')
   contextBridge.exposeInMainWorld('ripgrep', ripgrepAPI)
-  console.log('[preload] exposing uploader')
   contextBridge.exposeInMainWorld('uploader', uploaderAPI)
-  console.log('[preload] exposing fonts')
   contextBridge.exposeInMainWorld('fonts', fontsAPI)
-  console.log('[preload] exposing license')
   contextBridge.exposeInMainWorld('license', licenseAPI)
-  console.log('[preload] exposing payment')
   contextBridge.exposeInMainWorld('payment', paymentAPI)
-  console.log('[preload] exposing auth')
   contextBridge.exposeInMainWorld('auth', authAPI)
-  console.log('[preload] all APIs exposed successfully')
-} catch (error) {
-  console.error('[preload] error exposing APIs:', error)
+} catch {
+  // Exposing any API can fail only if contextIsolation is disabled; keep the
+  // bridge working silently otherwise.
 }

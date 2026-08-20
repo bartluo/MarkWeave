@@ -3,6 +3,7 @@ import Extensions from '@/components/Extensions'
 import FocusExport from '@/components/FocusExport'
 import Footer from '@/components/Footer'
 import Hero from '@/components/Hero'
+import HowToUse from '@/components/HowToUse'
 import Nav from '@/components/Nav'
 import PageEffects from '@/components/PageEffects'
 import Preview from '@/components/Preview'
@@ -19,6 +20,7 @@ export default function Home() {
       <span id="top" />
       <Hero />
       <Stats />
+      <HowToUse />
       <Preview />
       <Extensions />
       <Themes />

@@ -6,10 +6,88 @@ import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
 import { z } from 'zod'
 
+/* eslint-disable camelcase -- OAuth wire protocol uses snake_case fields */
+
 const APP_PORT = Number(process.env.AUTH_SERVER_PORT ?? 3230)
-const JWT_SECRET = process.env.JWT_SECRET ?? 'markweave-dev-secret-change-in-production'
+// Fail fast in production without a secret — a hardcoded fallback would allow
+// token forgery. Tests fall back to a throwaway secret.
+const JWT_SECRET =
+  process.env.JWT_SECRET ??
+  (process.env.NODE_ENV === 'test' ? 'test-only-secret' : '')
+if (!JWT_SECRET) {
+  console.error('FATAL: JWT_SECRET environment variable must be set')
+  process.exit(1)
+}
 const JWT_EXPIRES_IN = '7d'
 const REFRESH_JWT_EXPIRES_IN = '30d'
+
+const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID ?? ''
+const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET ?? ''
+const GITHUB_CLIENT_ID = process.env.GITHUB_CLIENT_ID ?? ''
+const GITHUB_CLIENT_SECRET = process.env.GITHUB_CLIENT_SECRET ?? ''
+
+// Exchange an authorization code for the user's verified email. The callback
+// must never trust the code or email sent by the client — only the provider's
+// token endpoint can confirm the user actually completed the OAuth flow.
+async function exchangeOAuthCode(
+  provider: 'google' | 'github',
+  code: string,
+  redirectUri: string
+): Promise<{ email: string } | null> {
+  try {
+    if (provider === 'google') {
+      if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET) return null
+      const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+          code,
+          client_id: GOOGLE_CLIENT_ID,
+          client_secret: GOOGLE_CLIENT_SECRET,
+          redirect_uri: redirectUri,
+          grant_type: 'authorization_code'
+        })
+      })
+      const tokenData = (await tokenRes.json().catch(() => null)) as { access_token?: string } | null
+      if (!tokenRes.ok || !tokenData?.access_token) return null
+      const userRes = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
+        headers: { Authorization: `Bearer ${tokenData.access_token}` }
+      })
+      const user = (await userRes.json().catch(() => null)) as { email?: string } | null
+      if (!userRes.ok || typeof user?.email !== 'string' || !user.email) return null
+      return { email: user.email }
+    }
+
+    if (!GITHUB_CLIENT_ID || !GITHUB_CLIENT_SECRET) return null
+    const tokenRes = await fetch('https://github.com/login/oauth/access_token', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json'
+      },
+      body: JSON.stringify({
+        code,
+        client_id: GITHUB_CLIENT_ID,
+        client_secret: GITHUB_CLIENT_SECRET,
+        redirect_uri: redirectUri
+      })
+    })
+    const tokenData = (await tokenRes.json().catch(() => null)) as { access_token?: string } | null
+    if (!tokenRes.ok || !tokenData?.access_token) return null
+    const userRes = await fetch('https://api.github.com/user', {
+      headers: {
+        Authorization: `Bearer ${tokenData.access_token}`,
+        'User-Agent': 'markweave-auth-server',
+        'X-GitHub-Api-Version': '2022-11-28'
+      }
+    })
+    const user = (await userRes.json().catch(() => null)) as { email?: string } | null
+    if (!userRes.ok || typeof user?.email !== 'string' || !user.email) return null
+    return { email: user.email }
+  } catch {
+    return null
+  }
+}
 
 // ── Auth context stored per-request via Hono context variables ──────────────
 type AuthCtx = { userId: string; email: string }
@@ -195,6 +273,9 @@ const authMiddleware = async (c: any, next: () => Promise<void>) => {
   }
   const payload = verifyToken(authHeader.slice(7))
   if (!payload) return c.json({ error: 'INVALID_TOKEN' }, 401)
+  // Refresh tokens are only valid for /v1/auth/refresh; they must not be
+  // usable as access tokens on every other endpoint.
+  if (payload.type === 'refresh') return c.json({ error: 'INVALID_TOKEN' }, 401)
   c.set('auth', { userId: payload.sub, email: payload.email })
   await next()
 }
@@ -413,18 +494,31 @@ app.get('/v1/oauth/:provider', (c) => {
   const provider = c.req.param('provider')
   const { redirect_uri } = c.req.query()
   if (!redirect_uri) return c.json({ error: 'MISSING_REDIRECT_URI' }, 400)
+  // The desktop app listens on a random loopback port. Refuse arbitrary
+  // redirect targets so an attacker cannot steer a real OAuth code to their
+  // own server and then replay it against this callback.
+  if (!/^http:\/\/127\.0\.0\.1:\d+\/callback$/i.test(redirect_uri)) {
+    return c.json({ error: 'INVALID_REDIRECT_URI' }, 400)
+  }
+  const state = c.req.query('state') ?? ''
   if (provider === 'google') {
     const url = `https://accounts.google.com/o/oauth2/v2/auth?${new URLSearchParams({
       client_id: process.env.GOOGLE_CLIENT_ID ?? '',
-      redirect_uri, response_type: 'code', scope: 'openid email profile',
-      access_type: 'offline', prompt: 'consent'
+      redirect_uri,
+      response_type: 'code',
+      scope: 'openid email profile',
+      access_type: 'offline',
+      prompt: 'consent',
+      state
     }).toString()}`
     return c.json({ authUrl: url })
   }
   if (provider === 'github') {
     const url = `https://github.com/login/oauth/authorize?${new URLSearchParams({
       client_id: process.env.GITHUB_CLIENT_ID ?? '',
-      redirect_uri, scope: 'read:user user:email'
+      redirect_uri,
+      scope: 'read:user user:email',
+      state
     }).toString()}`
     return c.json({ authUrl: url })
   }
@@ -437,31 +531,40 @@ app.post('/v1/oauth/callback', async (c) => {
   const parsed = z.object({
     code: z.string(),
     state: z.string(),
-    provider: z.enum(['google', 'github'])
+    provider: z.enum(['google', 'github']),
+    redirect_uri: z.string().regex(/^http:\/\/127\.0\.0\.1:\d+\/callback$/i)
   }).safeParse(body)
   if (!parsed.success) return c.json({ error: 'INVALID_INPUT' }, 400)
 
+  const identity = await exchangeOAuthCode(
+    parsed.data.provider,
+    parsed.data.code,
+    parsed.data.redirect_uri
+  )
+  if (!identity) {
+    return c.json({ error: 'OAUTH_EXCHANGE_FAILED' }, 401)
+  }
+
   const db = getDb()
   const now = Math.floor(Date.now() / 1000)
-  const email = `${parsed.data.provider}-user@oauth.local`
-  const userId = generateId()
+  const email = identity.email.toLowerCase()
 
-  const existing = db.prepare('SELECT id FROM users WHERE email = ?').get(email) as any
+  const existing = db.prepare('SELECT * FROM users WHERE email = ?').get(email) as any
   if (existing) {
-    const user = db.prepare('SELECT * FROM users WHERE id = ?').get(existing.id) as any
-    const accessToken = signAccessToken(user.id, user.email)
-    const refreshToken = signRefreshToken(user.id)
+    const accessToken = signAccessToken(existing.id, existing.email)
+    const refreshToken = signRefreshToken(existing.id)
     db.prepare(
       'INSERT INTO sessions (id, user_id, access_token, refresh_token, expires_at, created_at) VALUES (?, ?, ?, ?, ?, ?)'
-    ).run(generateId(), user.id, accessToken, refreshToken, now + 7 * 24 * 60 * 60, now)
+    ).run(generateId(), existing.id, accessToken, refreshToken, now + 7 * 24 * 60 * 60, now)
     db.close()
     return c.json({ ok: true, token: accessToken, refreshToken, expiresIn: 7 * 24 * 60 * 60 })
   }
 
+  const userId = generateId()
   const passwordHash = await hashPassword(crypto.randomBytes(32).toString('hex'))
   db.prepare(
     'INSERT INTO users (id, email, password_hash, display_name, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)'
-  ).run(userId, email, passwordHash, `${parsed.data.provider} User`, now, now)
+  ).run(userId, email, passwordHash, email.split('@')[0] || 'OAuth User', now, now)
 
   const accessToken = signAccessToken(userId, email)
   const refreshToken = signRefreshToken(userId)
@@ -474,31 +577,11 @@ app.post('/v1/oauth/callback', async (c) => {
 
 // ── 商业端点 ──────────────────────────────────────────────────────────────────
 
-// POST /v1/subscriptions — create or manage subscription
+// POST /v1/subscriptions is intentionally disabled. Plans must only be
+// activated after a verified payment via /v1/admin/plans; letting any signed-in
+// client create an active plan for itself would hand out paid features for free.
 app.post('/v1/subscriptions', authMiddleware, async (c) => {
-  const { userId } = c.get('auth')!
-  const body = await c.req.json()
-  const parsed = z.object({
-    planId: z.string(),
-    billingCycle: z.enum(['monthly', 'annual', 'lifetime']),
-    couponCode: z.string().optional(),
-    paymentMethod: z.string().optional()
-  }).safeParse(body)
-  if (!parsed.success) return c.json({ error: 'INVALID_INPUT' }, 400)
-
-  const db = getDb()
-  const now = Math.floor(Date.now() / 1000)
-  const id = generateId()
-  const plan = db.prepare('SELECT * FROM user_plans WHERE license_key_id = ?').get(parsed.data.planId) as any
-  const planType = plan?.plan ?? parsed.data.planId
-
-  db.prepare(
-    `INSERT INTO user_plans (id, user_id, license_key_id, plan, status, activated_at, expires_at, linked_at, order_id)
-     VALUES (?, ?, ?, ?, 'active', ?, ?, ?, ?)`
-  ).run(id, userId, parsed.data.planId, planType, now, now + 365 * 24 * 60 * 60, parsed.data.couponCode ?? null, null)
-  db.close()
-
-  return c.json({ ok: true, subscriptionId: id, planType, billingCycle: parsed.data.billingCycle })
+  return c.json({ ok: false, error: 'NOT_SUPPORTED' }, 403)
 })
 
 // GET /v1/subscriptions/me
@@ -682,8 +765,8 @@ app.post('/v1/notifications/:id/read', authMiddleware, async (c) => {
 app.post('/v1/referrals', authMiddleware, async (c) => {
   const { userId } = c.get('auth')!
   const db = getDb()
-  // Check if code already exists
-  const existing = db.prepare('SELECT id FROM referrals WHERE referrer_user_id = ?').get(userId) as any
+  // Check if code already exists — must select referral_code, not just id.
+  const existing = db.prepare('SELECT referral_code FROM referrals WHERE referrer_user_id = ?').get(userId) as any
   if (existing) return c.json({ ok: true, referralCode: existing.referral_code })
 
   const code = `MW-${crypto.randomBytes(4).toString('hex').toUpperCase()}`
@@ -696,26 +779,31 @@ app.post('/v1/referrals', authMiddleware, async (c) => {
 })
 
 // POST /v1/referrals/convert — convert referral code
-app.post('/v1/referrals/convert', async (c) => {
+app.post('/v1/referrals/convert', authMiddleware, async (c) => {
+  const { userId, email: referrerEmail } = c.get('auth')!
   const body = await c.req.json()
   const parsed = z.object({ code: z.string(), referredEmail: z.string().email() }).safeParse(body)
   if (!parsed.success) return c.json({ error: 'INVALID_INPUT' }, 400)
 
+  const referredEmail = parsed.data.referredEmail.toLowerCase()
+  if (referredEmail === referrerEmail.toLowerCase()) {
+    return c.json({ error: 'SELF_REFERRAL' }, 400)
+  }
+
   const db = getDb()
   const referral = db.prepare('SELECT * FROM referrals WHERE referral_code = ? AND status = \'pending\'').get(parsed.data.code) as any
   if (!referral) return c.json({ error: 'INVALID_CODE' }, 404)
+  if (referral.referrer_user_id === userId) return c.json({ error: 'SELF_REFERRAL' }, 400)
 
   // Find or create the referred user
-  const existingUser = db.prepare('SELECT id FROM users WHERE email = ?').get(parsed.data.referredEmail) as any
-  const referredUserId = existingUser?.id ?? generateId()
-  if (!existingUser) {
-    const now = Math.floor(Date.now() / 1000)
-    db.prepare(
-      'INSERT INTO users (id, email, display_name, created_at, updated_at) VALUES (?, ?, ?, ?, ?)'
-    ).run(referredUserId, parsed.data.referredEmail, 'Referred User', now, now)
-  }
-
+  const existingUser = db.prepare('SELECT id FROM users WHERE email = ?').get(referredEmail) as any
+  if (existingUser) return c.json({ error: 'ALREADY_REGISTERED' }, 409)
+  const referredUserId = generateId()
   const now = Math.floor(Date.now() / 1000)
+  db.prepare(
+    'INSERT INTO users (id, email, display_name, created_at, updated_at) VALUES (?, ?, ?, ?, ?)'
+  ).run(referredUserId, referredEmail, 'Referred User', now, now)
+
   db.prepare('UPDATE referrals SET status = \'converted\', referred_user_id = ?, converted_at = ? WHERE id = ?')
     .run(referredUserId, now, referral.id)
   db.close()
@@ -726,12 +814,20 @@ app.post('/v1/referrals/convert', async (c) => {
 
 const ADMIN_KEY = process.env.AUTH_ADMIN_KEY ?? ''
 
+// Constant-time comparison to prevent timing attacks on the admin key.
+const safeEqual = (a: string, b: string): boolean => {
+  const bufA = Buffer.from(a, 'utf8')
+  const bufB = Buffer.from(b, 'utf8')
+  if (bufA.length !== bufB.length) return false
+  return crypto.timingSafeEqual(bufA, bufB)
+}
+
 app.use('/v1/admin/*', async (c, next) => {
   const authHeader = c.req.header('Authorization')
   if (!ADMIN_KEY || !authHeader?.startsWith('Bearer ')) {
     return c.json({ error: 'UNAUTHORIZED' }, 401)
   }
-  if (authHeader.slice(7) !== ADMIN_KEY) {
+  if (!safeEqual(authHeader.slice(7), ADMIN_KEY)) {
     return c.json({ error: 'INVALID_KEY' }, 401)
   }
   await next()

@@ -1,15 +1,28 @@
+# Build from the repo root so the workspace:* dependency on
+# @markweave/license-core resolves:
+#   docker build -f packages/payment-server/Dockerfile .
 FROM node:22-alpine
+
+# better-sqlite3 falls back to node-gyp when no prebuilt binary exists
+RUN apk add --no-cache python3 make g++
+RUN corepack enable
 
 WORKDIR /app
 
-RUN apk add --no-cache python3 make g++
+# Workspace manifests first for layer caching
+COPY package.json pnpm-workspace.yaml pnpm-lock.yaml .npmrc ./
+COPY packages/license-core/package.json packages/license-core/
+COPY packages/payment-server/package.json packages/payment-server/
 
-COPY package.json ./
-COPY src ./src
-COPY tsconfig.json ./
+# Install only the payment-server dependency tree. --ignore-scripts skips the
+# root postinstall (Electron download + desktop native rebuilds); the only
+# native module this server needs is better-sqlite3, rebuilt explicitly.
+RUN pnpm install --frozen-lockfile --ignore-scripts --filter @markweave/payment-server... \
+  && pnpm rebuild better-sqlite3
 
-RUN npm install
+COPY packages/license-core packages/license-core
+COPY packages/payment-server packages/payment-server
 
+WORKDIR /app/packages/payment-server
 EXPOSE 3220
-
-CMD ["node", "src/index.ts"]
+CMD ["pnpm", "start"]

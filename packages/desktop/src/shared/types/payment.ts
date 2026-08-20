@@ -25,7 +25,7 @@ export interface OrderInfo {
   plan: PaymentPlan
   amountCents: number
   currency: string
-  email: string
+  email?: string
   licenseKey?: string
   paymentMethod?: PaymentMethod
   createdAt: number

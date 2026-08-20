@@ -36,7 +36,11 @@ export function verifyWechatV3HmacSignature(
     .createHmac('sha256', apiKey)
     .update(message, 'utf8')
     .digest('base64')
-  return crypto.timingSafeEqual(Buffer.from(signature, 'utf8'), Buffer.from(expected, 'utf8'))
+  const sigBuf = Buffer.from(signature, 'utf8')
+  const expBuf = Buffer.from(expected, 'utf8')
+  // timingSafeEqual throws on length mismatch — compare lengths first so a
+  // forged or truncated signature is rejected instead of crashing the handler.
+  return sigBuf.length === expBuf.length && crypto.timingSafeEqual(sigBuf, expBuf)
 }
 
 /**

@@ -39,11 +39,13 @@ describe('renderer i18n language loading', () => {
   it('loads an unavailable locale only once', async() => {
     const { setLanguage } = await import('../../../src/renderer/src/i18n')
 
-    setLanguage('zh-CN')
-    setLanguage('zh-CN')
+    // en and zh-CN are bundled by default; exercise a locale that must be
+    // fetched through window.i18nUtils.loadTranslations.
+    setLanguage('fr')
+    setLanguage('fr')
 
     expect(win.i18nUtils!.loadTranslations).toHaveBeenCalledTimes(1)
-    expect(win.i18nUtils!.loadTranslations).toHaveBeenCalledWith('zh-CN')
+    expect(win.i18nUtils!.loadTranslations).toHaveBeenCalledWith('fr')
   })
 })
 

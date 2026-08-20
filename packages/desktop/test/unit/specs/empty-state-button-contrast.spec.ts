@@ -39,6 +39,32 @@ const resolveVar = (value: string, vars: Record<string, string>): string => {
   return v
 }
 
+// Split a (possibly nested) scoped-CSS block into selector/body pairs by
+// balancing braces. The old regex could not see rules nested under Sass-style
+// parent selectors (e.g. `& .welcome-btn:not(.primary)`).
+const extractRules = (css: string): Array<{ selector: string; body: string }> => {
+  const rules: Array<{ selector: string; body: string }> = []
+  const stack: Array<{ open: number; selectorStart: number }> = []
+  let blockStart = 0
+  for (let i = 0; i < css.length; i++) {
+    const ch = css[i]
+    if (ch === '{') {
+      const selectorStart = stack.length === 0 ? blockStart : stack[stack.length - 1].open + 1
+      stack.push({ open: i, selectorStart })
+    } else if (ch === '}') {
+      const top = stack.pop()
+      if (top !== undefined) {
+        rules.push({
+          selector: css.slice(top.selectorStart, top.open),
+          body: css.slice(top.open + 1, i)
+        })
+        if (stack.length === 0) blockStart = i + 1
+      }
+    }
+  }
+  return rules
+}
+
 const toRgba = (raw: string): Rgba | null => {
   const str = raw.trim()
   let m: RegExpMatchArray | null
@@ -121,17 +147,16 @@ const pairContrast = (
 // Pull the foreground (color) and background-color custom-property names the
 // empty-state button rule assigns, straight from the component's scoped CSS.
 const extractButtonVars = (
-  componentPath: string
+  componentPath: string,
+  selector = '.is-text.is-has-bg'
 ): { fgVar: string; bgVar: string } => {
   const css = readFileSync(componentPath, 'utf8')
-  const ruleRe = /([^{}]+)\{([^{}]*)\}/g
-  let m: RegExpExecArray | null
-  while ((m = ruleRe.exec(css))) {
-    const selector = m[1]
-    const body = m[2]
-    if (!selector.includes('.is-text.is-has-bg')) continue
-    if (/:hover|:focus/.test(selector)) continue
-    const bg = body.match(/(?<![-\w])background-color:\s*var\(\s*(--[\w-]+)/)
+  for (const { selector: ruleSelector, body } of extractRules(css)) {
+    if (!ruleSelector.includes(selector)) continue
+    const selIndex = ruleSelector.indexOf(selector)
+    const tail = selIndex === -1 ? '' : ruleSelector.slice(selIndex)
+    if (/:hover|:focus/.test(tail)) continue
+    const bg = body.match(/(?<![-\w])background(?:-color)?:\s*var\(\s*(--[\w-]+)/)
     const fg = body.match(/(?<![-\w])color:\s*var\(\s*(--[\w-]+)/)
     if (bg && fg) return { fgVar: fg[1], bgVar: bg[1] }
   }
@@ -141,7 +166,12 @@ const extractButtonVars = (
 const baseVars = parseVars(readFileSync(BASE_CSS, 'utf8'))
 const themeFiles = readdirSync(THEME_DIR).filter((f) => f.endsWith('.theme.css'))
 
-const COMPONENTS = [
+const COMPONENTS: Array<{
+  name: string
+  path: string
+  surfaceVar: string
+  selector?: string
+}> = [
   {
     name: 'Open Folder (sidebar/tree.vue)',
     path: resolve(RENDERER, 'components/sideBar/tree.vue'),
@@ -150,7 +180,8 @@ const COMPONENTS = [
   {
     name: 'New File (recent/index.vue)',
     path: resolve(RENDERER, 'components/recent/index.vue'),
-    surfaceVar: '--editorBgColor'
+    surfaceVar: '--editorBgColor',
+    selector: '.welcome-btn:not(.primary)'
   },
   {
     name: 'Open Folder (sideBar/search.vue no-data)',
@@ -168,7 +199,7 @@ describe('empty-state button readability (#4774)', () => {
 
   for (const component of COMPONENTS) {
     it(`${component.name} label is at least as readable as the standard primary button, in every theme`, () => {
-      const { fgVar, bgVar } = extractButtonVars(component.path)
+      const { fgVar, bgVar } = extractButtonVars(component.path, component.selector)
       const failures: string[] = []
 
       for (const file of themeFiles) {

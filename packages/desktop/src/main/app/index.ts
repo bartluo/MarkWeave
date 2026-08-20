@@ -7,6 +7,7 @@ import { app, BrowserWindow, clipboard, dialog, nativeTheme, shell, ipcMain } fr
 import type { BrowserWindowConstructorOptions } from 'electron'
 import { isChildOfDirectory } from 'common/filesystem/paths'
 import type { IUserPreferences } from '@shared/types/preferences'
+import { assertWritablePath } from '../ipc/fs'
 import { isLinux, isOsx, isWindows } from '../config'
 import parseArgs from '../cli/parser'
 import { normalizeAndResolvePath } from '../filesystem'
@@ -845,7 +846,8 @@ class App {
     })
 
     ipcMain.handle('mt::fs-trash-item', async(_event, fullPath: string) => {
-      return shell.trashItem(fullPath)
+      const resolved = assertWritablePath(fullPath, 'trash-item')
+      return shell.trashItem(resolved)
     })
   }
 }

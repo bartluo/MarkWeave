@@ -1,7 +1,7 @@
 import crypto from 'node:crypto'
 import http from 'node:http'
-import { BrowserWindow, shell } from 'electron'
-import keytar from 'keytar'
+import type { AddressInfo } from 'node:net'
+import { BrowserWindow } from 'electron'
 import log from 'electron-log'
 import { getLicenseManager, type LicenseFeature } from '../license'
 import type {
@@ -11,14 +11,12 @@ import type {
   RegisterRequest,
   UserProfile,
   DeviceList,
-  UserDeviceInfo,
   OAuthChallenge,
   OAuthTokenResponse,
   LinkAccountResult,
   MigrateLicenseResult,
   UserSubscription,
   BillingCycle,
-  Team,
   TeamDetail,
   Notification,
   Referral,
@@ -28,16 +26,20 @@ import { TokenStore } from './tokenStore'
 
 const AUTH_SERVER_URL =
   process.env.MARKWEAVE_AUTH_SERVER ?? 'https://auth.markweave.app'
-const KEYTAR_SERVICE = 'markweave'
-const KEYTAR_ACCOUNT_EMAIL = 'auth-email'
-const KEYTAR_ACCOUNT_PASSWORD = 'auth-password'
 
 class AuthManager {
   private tokenStore: TokenStore
   private serverUrl: string
   private state: AuthStatus
   private refreshTimer?: NodeJS.Timeout
-  private callbackServer?: http.Server
+  // Pending OAuth challenge, kept to validate the CSRF `state` when the
+  // authorization code comes back, plus the loopback redirect we told the
+  // provider about.
+  private pendingOAuth?: {
+    state: string
+    provider: 'google' | 'github'
+    redirectUri: string
+  }
 
   constructor() {
     this.tokenStore = new TokenStore()
@@ -53,29 +55,35 @@ class AuthManager {
   // ---------- 状态恢复 ----------
 
   private async restoreState(): Promise<void> {
+    await this.tokenStore.migrationReady()
     const licenseMgr = getLicenseManager()
     const localLicense = licenseMgr.getState().status === 'activated'
 
     // Try to restore tokens from keytar
     const restored = await this.tokenStore.restoreFromKeytar()
     if (restored) {
-      const valid = this.tokenStore.isTokenValid()
-      if (valid) {
-        this.state = {
-          authenticated: true,
-          provider: this.tokenStore.getProvider() as AuthStatus['provider'],
-          email: this.tokenStore.getUserId()
-            ? undefined
-            : undefined,
-          hasLocalLicense: localLicense,
-          hasCloudLicense: true,
-          lastLoginAt: this.tokenStore.getExpiresAt()
-            ? this.tokenStore.getExpiresAt()! - 7 * 24 * 60 * 60 * 1000
-            : undefined
+      // If the access token expired while the app was closed, try a silent
+      // refresh so the user stays signed in across restarts.
+      if (!this.tokenStore.isTokenValid()) {
+        const refreshed = await this.refreshToken().catch(() => ({ ok: false }))
+        if (!refreshed.ok) {
+          this.state = {
+            authenticated: false,
+            hasLocalLicense: localLicense,
+            hasCloudLicense: false
+          }
+          return
         }
-        this.startTokenRefresh()
-        return
       }
+      this.state = {
+        authenticated: true,
+        provider: this.tokenStore.getProvider() as AuthStatus['provider'],
+        email: this.tokenStore.getUserId(),
+        hasLocalLicense: localLicense,
+        hasCloudLicense: true
+      }
+      this.startTokenRefresh()
+      return
     }
 
     this.state = {
@@ -86,7 +94,6 @@ class AuthManager {
   }
 
   private emitStateChange(): void {
-    const { BrowserWindow } = require('electron')
     for (const win of BrowserWindow.getAllWindows()) {
       if (!win.isDestroyed()) {
         win.webContents.send('mt::auth::state-changed', this.state)
@@ -246,7 +253,12 @@ class AuthManager {
   async deactivateDevice(deviceId: string): Promise<{ ok: boolean }> {
     const token = this.tokenStore.getAccessToken()
     if (!token || !this.tokenStore.isTokenValid()) return { ok: false }
-    await this.postJson<void>(`/v1/devices/${deviceId}`, {}, token).catch(() => {})
+    // deviceId is interpolated into the URL path — validate to prevent path
+    // traversal / query injection against the auth server.
+    if (typeof deviceId !== 'string' || !/^[A-Za-z0-9_-]{1,128}$/.test(deviceId)) {
+      return { ok: false }
+    }
+    await this.postJson<void>(`/v1/devices/${encodeURIComponent(deviceId)}`, {}, token).catch(() => {})
     return { ok: true }
   }
 
@@ -341,7 +353,8 @@ class AuthManager {
   async getTeam(teamId: string): Promise<TeamDetail | null> {
     const token = this.tokenStore.getAccessToken()
     if (!token || !this.tokenStore.isTokenValid()) return null
-    return this.getJson<TeamDetail>(`/v1/teams/${teamId}`, token)
+    if (typeof teamId !== 'string' || !/^[A-Za-z0-9_-]{1,128}$/.test(teamId)) return null
+    return this.getJson<TeamDetail>(`/v1/teams/${encodeURIComponent(teamId)}`, token)
   }
 
   async inviteTeamMember(teamId: string, email: string, role?: 'admin' | 'member'): Promise<{ ok: boolean; inviteCode?: string; error?: string }> {
@@ -349,8 +362,11 @@ class AuthManager {
     if (!token || !this.tokenStore.isTokenValid()) {
       return { ok: false, error: 'NOT_AUTHENTICATED' }
     }
+    if (typeof teamId !== 'string' || !/^[A-Za-z0-9_-]{1,128}$/.test(teamId)) {
+      return { ok: false, error: 'INVALID_TEAM_ID' }
+    }
     const res = await this.postJson<{ ok: boolean; inviteCode?: string }>(
-      `/v1/teams/${teamId}/invite`,
+      `/v1/teams/${encodeURIComponent(teamId)}/invite`,
       { email, role },
       token
     )
@@ -379,11 +395,16 @@ class AuthManager {
   }
 
   async convertReferral(code: string, email: string): Promise<{ ok: boolean; error?: string }> {
+    const token = this.tokenStore.getAccessToken()
+    if (!token || !this.tokenStore.isTokenValid()) {
+      return { ok: false, error: 'NOT_AUTHENTICATED' }
+    }
     const res = await this.postJson<{ ok: boolean }>(
       '/v1/referrals/convert',
-      { code, referredEmail: email }
+      { code, referredEmail: email },
+      token
     )
-    return res ?? { ok: false }
+    return res ?? { ok: false, error: 'SERVER' }
   }
 
   async getNotifications(): Promise<Notification[]> {
@@ -402,7 +423,10 @@ class AuthManager {
   async markNotificationRead(notificationId: string): Promise<{ ok: boolean }> {
     const token = this.tokenStore.getAccessToken()
     if (!token || !this.tokenStore.isTokenValid()) return { ok: false }
-    await this.postJson<void>(`/v1/notifications/${notificationId}/read`, {}, token).catch(() => {})
+    if (typeof notificationId !== 'string' || !/^[A-Za-z0-9_-]{1,128}$/.test(notificationId)) {
+      return { ok: false }
+    }
+    await this.postJson<void>(`/v1/notifications/${encodeURIComponent(notificationId)}/read`, {}, token).catch(() => {})
     return { ok: true }
   }
 
@@ -416,23 +440,96 @@ class AuthManager {
   // ---------- OAuth ----------
 
   async startOAuth(provider: 'google' | 'github'): Promise<OAuthChallenge> {
-    if (!this.isCloudEnabled()) {
+    if (!this.isCloudEnabled() || (provider !== 'google' && provider !== 'github')) {
       return { codeVerifier: '', authUrl: '', state: '' }
     }
-    // Open browser for OAuth consent
-    const authUrl = `${this.serverUrl}/v1/oauth/${provider}?redirect_uri=http://127.0.0.1:0/callback`
-    await shell.openExternal(authUrl)
-    // Return minimal challenge; actual code exchange happens in callback
-    return {
-      codeVerifier: crypto.randomBytes(32).toString('base64url'),
-      authUrl,
-      state: crypto.randomBytes(16).toString('hex')
+
+    // Listen on a random loopback port so the browser can hand the code back
+    // to this app instance; nobody else knows the port or state.
+    const server = http.createServer()
+    await new Promise<void>((resolve, reject) => {
+      server.once('error', reject)
+      server.listen(0, '127.0.0.1', resolve)
+    })
+    const address = server.address() as AddressInfo
+    const redirectUri = `http://127.0.0.1:${address.port}/callback`
+    const state = crypto.randomBytes(16).toString('hex')
+
+    const authUrl = await this.getJson<{ authUrl: string }>(
+      `/v1/oauth/${provider}?redirect_uri=${encodeURIComponent(redirectUri)}&state=${encodeURIComponent(state)}`
+    )
+    if (!authUrl?.authUrl) {
+      server.close()
+      return { codeVerifier: '', authUrl: '', state: '' }
     }
+
+    this.pendingOAuth = { state, provider, redirectUri }
+
+    // Clean up if the user never finishes the flow.
+    const oauthTimeout = setTimeout(() => {
+      if (this.pendingOAuth?.state === state) {
+        this.pendingOAuth = undefined
+        server.close()
+      }
+    }, 5 * 60 * 1000)
+    oauthTimeout.unref?.()
+
+    server.on('request', (req, res) => {
+      const url = new URL(req.url ?? '/', redirectUri)
+      const code = url.searchParams.get('code') ?? ''
+      const returnedState = url.searchParams.get('state') ?? ''
+      const ok =
+        this.pendingOAuth?.provider === provider &&
+        returnedState.length === state.length &&
+        crypto.timingSafeEqual(Buffer.from(returnedState), Buffer.from(state))
+      if (!ok) {
+        res.writeHead(400, { 'Content-Type': 'text/plain; charset=utf-8' })
+        res.end('OAuth state mismatch')
+        this.pendingOAuth = undefined
+        server.close()
+        return
+      }
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' })
+      res.end('<html><body><h3>MarkWeave 登录成功，可以关闭此页面。</h3></body></html>')
+      if (oauthTimeout) clearTimeout(oauthTimeout)
+      this.handleOAuthCallback(code, returnedState, provider)
+        .catch(() => {})
+        .finally(() => server.close())
+    })
+
+    // The renderer opens this URL (it already does after startOAuth returns).
+    const challenge: OAuthChallenge = {
+      codeVerifier: crypto.randomBytes(32).toString('base64url'),
+      authUrl: authUrl.authUrl,
+      state
+    }
+    return challenge
   }
 
   async handleOAuthCallback(code: string, state: string, provider: 'google' | 'github'): Promise<AuthResult> {
     if (!this.isCloudEnabled()) return { ok: false, error: 'CLOUD_DISABLED' }
-    const res = await this.postJson<OAuthTokenResponse>('/v1/oauth/callback', { code, state, provider })
+    // CSRF protection: reject callbacks whose state/provider don't match the
+    // challenge we issued in startOAuth.
+    if (
+      !this.pendingOAuth ||
+      typeof state !== 'string' ||
+      state.length !== this.pendingOAuth.state.length ||
+      !crypto.timingSafeEqual(Buffer.from(state), Buffer.from(this.pendingOAuth.state)) ||
+      provider !== this.pendingOAuth.provider
+    ) {
+      return { ok: false, error: 'OAUTH_STATE_MISMATCH' }
+    }
+    const { redirectUri } = this.pendingOAuth
+    this.pendingOAuth = undefined
+    if (typeof code !== 'string' || code.length === 0) {
+      return { ok: false, error: 'OAUTH_FAILED' }
+    }
+    const res = await this.postJson<OAuthTokenResponse>('/v1/oauth/callback', {
+      code,
+      state,
+      provider,
+      redirect_uri: redirectUri
+    })
     if (!res || !res.ok) return { ok: false, error: res?.error ?? 'OAUTH_FAILED' }
     await this.tokenStore.saveTokens(res.accessToken!, res.refreshToken!, res.expiresIn!)
     await this.tokenStore.saveProfile('oauth-user', `oauth:${provider}`)

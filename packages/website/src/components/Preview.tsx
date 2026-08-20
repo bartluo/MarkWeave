@@ -10,61 +10,59 @@ export default function Preview() {
         <div className="split">
           <div className="split-text">
             <div className="sec-head reveal">
-              <span className="kicker">Real-time preview</span>
-              <h2 className="sec-title">See it as you mean it.</h2>
+              <span className="kicker">实时渲染</span>
+              <h2 className="sec-title">输入即所见，排版不等待。</h2>
               <p className="sec-desc">
-                A true WYSIWYG editor — your Markdown transforms in place the moment you type. No
-                split view, no toggling.
+                真正的所见即所得：Markdown 在键入的瞬间就地变成排版结果。没有分栏，没有预览切换。
               </p>
             </div>
             <div className="feat-list">
               <FeatItem
                 delay="d1"
                 icon={<BoltIcon />}
-                title="Render in place"
+                title="原地渲染"
                 description={
                   <>
-                    Type <code className="inline">## Heading</code> and watch the markup melt away.
+                    输入 <code className="inline">## 标题</code>，标记立即消失，标题当场成形。
                   </>
                 }
               />
               <FeatItem
                 delay="d2"
                 icon={<LinesIcon />}
-                title="Source code mode"
-                description="Drop into raw Markdown anytime you need full control."
+                title="源码模式"
+                description="需要精细控制时，一键切回原始 Markdown 编辑。"
               />
               <FeatItem
                 delay="d3"
                 icon={<GridSmallIcon />}
-                title="Paste & go"
-                description="Paste rich text and MarkWeave converts it to clean Markdown."
+                title="粘贴即整理"
+                description="粘贴富文本内容，MarkWeave 会自动转换成干净的 Markdown。"
               />
             </div>
           </div>
           <div className="reveal d2">
             <MockWindow title="typing.md" docStyle={{ minHeight: 320 }}>
-              <h2 style={{ marginTop: 0 }}>As you type</h2>
+              <h2 style={{ marginTop: 0 }}>正在输入</h2>
               <p>
                 <span className="synt">**</span>
-                <strong>Bold</strong>
-                <span className="synt">**</span> snaps bold, <span className="synt">_</span>
-                <em>italics</em>
-                <span className="synt">_</span> lean, and links become{' '}
+                <strong>加粗</strong>
+                <span className="synt">**</span> 自动加粗，<span className="synt">_</span>
+                <em>斜体</em>
+                <span className="synt">_</span> 自动倾斜，链接写完即可点击：
                 <a className="link" href="#">
-                  clickable
+                  可点击链接
                 </a>{' '}
-                the instant you finish them.
               </p>
-              <p>Lists build themselves:</p>
+              <p>列表也会自动成型：</p>
               <ul>
-                <li>One keystroke per bullet</li>
-                <li>Nesting just works</li>
+                <li>一个键完成一个项目符号</li>
+                <li>层级嵌套自动处理</li>
                 <li>
-                  Checkboxes too <span className="cursor" />
+                  任务清单同样支持 <span className="cursor" />
                 </li>
               </ul>
-              <blockquote>Stay in flow — never touch a render button again.</blockquote>
+              <blockquote>保持心流，再也不用按渲染按钮。</blockquote>
             </MockWindow>
           </div>
         </div>

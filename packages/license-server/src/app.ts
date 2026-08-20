@@ -1,8 +1,8 @@
 import { Hono } from 'hono'
-import { randomUUID } from 'node:crypto'
+import { randomUUID, timingSafeEqual } from 'node:crypto'
 import { z } from 'zod'
 import { canonicalize, decodeKey, encodeKey, keyIdOfPayload, signPayload, verifyPayload } from '@markweave/license-core'
-import type { ActivateResponse, KeyPayload, LicenseInfo, LicensePlan, ValidateResponse } from '@markweave/license-core'
+import type { ActivateResponse, LicenseInfo, LicensePlan, ValidateResponse } from '@markweave/license-core'
 import type { Store, LicenseRow } from './db'
 import type { ServerConfig } from './config'
 import type { KeyPair } from './keys'
@@ -39,12 +39,20 @@ const parseJson = async(request: Request): Promise<unknown> => {
   }
 }
 
+// Constant-time comparison to prevent timing attacks on the admin key.
+const safeEqual = (a: string, b: string): boolean => {
+  const bufA = Buffer.from(a, 'utf8')
+  const bufB = Buffer.from(b, 'utf8')
+  if (bufA.length !== bufB.length) return false
+  return timingSafeEqual(bufA, bufB)
+}
+
 export const createApp = (store: Store, cfg: ServerConfig, keys: KeyPair): Hono => {
   const app = new Hono()
 
   app.get('/v1/health', (c) => c.json({ ok: true, ts: Date.now() }))
 
-  app.post('/v1/activate', async (c) => {
+  app.post('/v1/activate', async(c) => {
     const body = await parseJson(c.req.raw)
     const parsed = activateSchema.safeParse(body)
     if (!parsed.success) return c.json({ ok: false, error: 'BAD_REQUEST' } satisfies ActivateResponse, 400)
@@ -55,7 +63,13 @@ export const createApp = (store: Store, cfg: ServerConfig, keys: KeyPair): Hono 
     if (!verifyPayload(keys.publicKey, decoded.payload, decoded.signature)) {
       return c.json({ ok: false, error: 'INVALID_SIGNATURE' } satisfies ActivateResponse)
     }
-    const payload = JSON.parse(decoded.payload) as KeyPayload
+    // The payload is signature-verified, but still validate it parses as JSON
+    // before deriving the key id from it.
+    try {
+      JSON.parse(decoded.payload)
+    } catch {
+      return c.json({ ok: false, error: 'BAD_FORMAT' } satisfies ActivateResponse)
+    }
     const license = store.getLicenseByKeyId(keyIdOfPayload(decoded.payload))
     if (!license) return c.json({ ok: false, error: 'UNKNOWN_KEY' } satisfies ActivateResponse)
     if (license.revoked_at) return c.json({ ok: false, error: 'REVOKED' } satisfies ActivateResponse)
@@ -72,7 +86,7 @@ export const createApp = (store: Store, cfg: ServerConfig, keys: KeyPair): Hono 
     return c.json({ ok: true, activationId, license: toLicenseInfo(license) } satisfies ActivateResponse)
   })
 
-  app.post('/v1/validate', async (c) => {
+  app.post('/v1/validate', async(c) => {
     const body = await parseJson(c.req.raw)
     const parsed = validateSchema.safeParse(body)
     if (!parsed.success) return c.json({ ok: false, error: 'BAD_REQUEST' }, 400)
@@ -97,7 +111,7 @@ export const createApp = (store: Store, cfg: ServerConfig, keys: KeyPair): Hono 
     return c.json({ ok: true, license: toLicenseInfo(row) } satisfies ValidateResponse)
   })
 
-  app.post('/v1/deactivate', async (c) => {
+  app.post('/v1/deactivate', async(c) => {
     const body = await parseJson(c.req.raw)
     const parsed = deactivateSchema.safeParse(body)
     if (!parsed.success) return c.json({ ok: false, error: 'BAD_REQUEST' }, 400)
@@ -109,15 +123,16 @@ export const createApp = (store: Store, cfg: ServerConfig, keys: KeyPair): Hono 
     return c.json({ ok: true })
   })
 
-  app.use('/v1/admin/*', async (c, next) => {
+  app.use('/v1/admin/*', async(c, next) => {
     const expected = cfg.adminKey
-    if (!expected || c.req.header('Authorization') !== `Bearer ${expected}`) {
+    const header = c.req.header('Authorization')
+    if (!expected || !header?.startsWith('Bearer ') || !safeEqual(header.slice(7), expected)) {
       return c.json({ error: 'UNAUTHORIZED' }, 401)
     }
     await next()
   })
 
-  app.post('/v1/admin/licenses', async (c) => {
+  app.post('/v1/admin/licenses', async(c) => {
     const body = await parseJson(c.req.raw)
     const parsed = issueSchema.safeParse(body)
     if (!parsed.success) return c.json({ error: 'BAD_REQUEST' }, 400)
@@ -159,7 +174,7 @@ export const createApp = (store: Store, cfg: ServerConfig, keys: KeyPair): Hono 
     return c.json({ ok: true })
   })
 
-  app.post('/v1/admin/licenses/:keyId/extend', async (c) => {
+  app.post('/v1/admin/licenses/:keyId/extend', async(c) => {
     const body = await parseJson(c.req.raw)
     const parsed = z.object({ expiresAt: z.number().int().nonnegative() }).safeParse(body)
     if (!parsed.success) return c.json({ error: 'BAD_REQUEST' }, 400)

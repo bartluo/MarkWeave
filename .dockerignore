@@ -1,0 +1,11 @@
+.git
+**/node_modules
+dist
+out
+release
+coverage
+*.log
+.env
+.env.*
+packages/*/data
+packages/*/dist

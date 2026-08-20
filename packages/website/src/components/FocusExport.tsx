@@ -9,18 +9,18 @@ export default function FocusExport() {
           <FeatureCard
             variant="lg"
             icon={<TargetIcon />}
-            title="Focus & typewriter mode"
-            description="Dim everything but the line you're writing, and keep it locked to center. Distraction-free by design."
+            title="专注模式与打字机模式"
+            description="除当前行之外全部淡化，并让光标保持在屏幕中央。天生免打扰。"
           >
             <div className="mini mini--lg">
-              <span style={{ opacity: 0.3 }}>The paragraph above fades back.</span>
+              <span style={{ opacity: 0.3 }}>上方段落逐渐淡出。</span>
               <br />
               <span style={{ color: 'var(--text)' }}>
-                This line stays sharp and centered.
+                这一行始终保持清晰并居中。
                 <span className="cursor" />
               </span>
               <br />
-              <span style={{ opacity: 0.3 }}>And the next one waits its turn.</span>
+              <span style={{ opacity: 0.3 }}>下一段正在等待轮到自己。</span>
             </div>
           </FeatureCard>
 
@@ -28,11 +28,10 @@ export default function FocusExport() {
             variant="lg"
             delay="d1"
             icon={<ExportIcon />}
-            title="Export anywhere"
+            title="随处导出"
             description={
               <>
-                Turn any document into a polished <strong>PDF</strong> or self-contained{' '}
-                <strong>HTML</strong> file — your theme included.
+                把任意文档变成排版精美的 <strong>PDF</strong> 或自包含的 <strong>HTML</strong> 文件，主题一并保留。
               </>
             }
           >

@@ -93,7 +93,13 @@ export const usePaymentStore = defineStore('payment', () => {
     while (polls < maxPolls && !_pollCancelled) {
       await pollOnce()
       if (_pollCancelled) { return }
-      const order = await window.payment.getOrder(orderId)
+      let order: OrderInfo | null = null
+      try {
+        order = await window.payment.getOrder(orderId)
+      } catch (e) {
+        // 单次查询失败（网络抖动/IPC 异常）不应终止整个轮询循环
+        console.warn('pollOrder: getOrder failed, will retry:', e)
+      }
       if (order) {
         currentOrder.value = order
         onOrder?.(order)
@@ -106,9 +112,14 @@ export const usePaymentStore = defineStore('payment', () => {
   }
 
   async function refreshOrder(orderId: string): Promise<OrderInfo | null> {
-    const order = await window.payment.getOrder(orderId)
-    currentOrder.value = order
-    return order
+    try {
+      const order = await window.payment.getOrder(orderId)
+      currentOrder.value = order
+      return order
+    } catch (e) {
+      console.error('refreshOrder failed:', e)
+      return null
+    }
   }
 
   return {

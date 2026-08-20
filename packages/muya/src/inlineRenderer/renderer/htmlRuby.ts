@@ -1,6 +1,7 @@
 import type { HTMLTagToken, ISyntaxRenderOptions } from '../types';
 import type Renderer from './index';
 import { CLASS_NAMES } from '../../config';
+import sanitize from '../../utils/dompurify';
 import { htmlToVNode } from '../../utils/snabbdom';
 
 export default function htmlRuby(
@@ -17,7 +18,16 @@ export default function htmlRuby(
     const { children } = token;
     const { start, end } = token.range;
     const content = this.highlight(h, block, start, end, token);
-    const vNode = htmlToVNode(token.raw);
+    // `token.raw` is untrusted user input. Sanitize it before parsing into
+    // vnodes — `htmlToVNode` assigns `innerHTML`, which would otherwise allow
+    // DOM XSS (e.g. `<ruby><img src=x onerror=...>`). Only ruby markup is
+    // needed for the preview, so restrict the allowed tags accordingly.
+    const vNode = htmlToVNode(
+        sanitize(token.raw, {
+            ALLOWED_TAGS: ['ruby', 'rt', 'rp', 'rb', 'rtc', '#text'],
+            ALLOWED_ATTR: [],
+        }),
+    );
     const previewSelector = `span.${CLASS_NAMES.MU_RUBY_RENDER}`;
 
     return children?.length

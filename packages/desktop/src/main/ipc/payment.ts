@@ -24,6 +24,11 @@ async function paymentFetch<T>(path: string, body?: unknown): Promise<T | null> 
   }
 }
 
+// `orderId` is interpolated into a URL path segment. Without validation a
+// crafted value (`../admin`, `?x=`, `#…`) could traverse to other endpoints
+// or inject query/fragment parts on the payment server.
+const SAFE_ORDER_ID = /^[A-Za-z0-9_-]{1,128}$/
+
 export const registerPaymentHandlers = (): void => {
   ipcMain.handle('mt::payment::get-plans', async () => {
     const res = await paymentFetch<{ plans: PaymentPlanInfo[] }>('/v1/plans')
@@ -31,6 +36,12 @@ export const registerPaymentHandlers = (): void => {
   })
 
   ipcMain.handle('mt::payment::checkout', async (_event, plan: PaymentPlanInfo, email: string, method: PaymentMethod, customerName?: string) => {
+    if (!plan || typeof plan.id !== 'string' || plan.id.length === 0) {
+      return { ok: false, error: 'INVALID_PLAN' }
+    }
+    if (typeof email !== 'string' || email.length === 0 || email.length > 254) {
+      return { ok: false, error: 'INVALID_EMAIL' }
+    }
     const res = await paymentFetch<CheckoutOutcome>('/v1/orders', {
       email,
       plan: plan.id,
@@ -40,7 +51,11 @@ export const registerPaymentHandlers = (): void => {
   })
 
   ipcMain.handle('mt::payment::get-order', async (_event, orderId: string) => {
-    const res = await paymentFetch<OrderInfo | null>(`/v1/orders/${orderId}`)
+    if (typeof orderId !== 'string' || !SAFE_ORDER_ID.test(orderId)) {
+      log.warn('payment get-order blocked invalid orderId:', orderId)
+      return null
+    }
+    const res = await paymentFetch<OrderInfo | null>(`/v1/orders/${encodeURIComponent(orderId)}`)
     return res
   })
 }

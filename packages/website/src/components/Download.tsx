@@ -1,14 +1,13 @@
 import type { ReactNode } from 'react'
-import { DOWNLOAD } from '@/lib/downloads'
-import { EXT_LINK } from '@/lib/links'
+import Link from 'next/link'
 import { SECTIONS } from '@/lib/sections'
 import { LinuxIcon, MacIcon, WindowsIcon } from './Icons'
 
 type Platform = { icon: ReactNode; label: string; sub: string }
 
 const PLATFORMS: Platform[] = [
-  { icon: <MacIcon />, label: 'macOS', sub: '.dmg · Apple Silicon & Intel' },
-  { icon: <WindowsIcon />, label: 'Windows', sub: '.exe · x64 & ARM64' },
+  { icon: <MacIcon />, label: 'macOS', sub: '.dmg · Apple Silicon 与 Intel' },
+  { icon: <WindowsIcon />, label: 'Windows', sub: '.exe · x64 与 ARM64' },
   { icon: <LinuxIcon />, label: 'Linux', sub: '.AppImage · .deb · .rpm' }
 ]
 
@@ -18,25 +17,25 @@ export default function Download() {
       <div className="wrap">
         <div className="cta reveal">
           <div className="cta-glow" />
-          <span className="kicker kicker--center">Free download</span>
+          <span className="kicker kicker--center">免费下载</span>
           <h2>
-            Start writing in <span className="grad-text">two minutes</span>.
+            两分钟，<span className="grad-text">开始写作</span>。
           </h2>
-          <p>One download. No account, no subscription. Every desktop you write on.</p>
+          <p>一个安装包，无需账号、无需订阅。所有桌面平台都能用。</p>
           <div className="platforms">
             {PLATFORMS.map((p) => (
-              <a className="plat" key={p.label} href={DOWNLOAD.releases} {...EXT_LINK}>
+              <Link className="plat" key={p.label} href="/download">
                 {p.icon}
                 <div>
                   <b>{p.label}</b>
                   <span>{p.sub}</span>
                 </div>
-              </a>
+              </Link>
             ))}
           </div>
           <div className="hero-note hero-note--cta">
             <span>
-              Or install via Homebrew: <code className="inline">brew install --cask mark-text</code>
+              也可通过 Homebrew 安装：<code className="inline">brew install --cask mark-text</code>
             </span>
           </div>
         </div>

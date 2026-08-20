@@ -5,15 +5,15 @@ import { rgPath } from '@vscode/ripgrep'
 import { MARKDOWN_INCLUSIONS } from 'common/filesystem/paths'
 import type { BootInfo } from '@shared/types/ipc'
 
+// Only expose the minimum environment variables the renderer actually needs.
+// `PATH` and `HOME` were previously included but leak install locations and
+// the OS username into every renderer; nothing in the renderer reads them.
 const ENV_ALLOWLIST = [
   'NODE_ENV',
   'PERF_TESTING',
   'APPIMAGE',
   'MARKTEXT_VERSION',
-  'MARKTEXT_VERSION_STRING',
-  'MARKTEXT_RIPGREP_PATH',
-  'PATH',
-  'HOME'
+  'MARKTEXT_VERSION_STRING'
 ]
 
 const pickEnv = (): Record<string, string> => {

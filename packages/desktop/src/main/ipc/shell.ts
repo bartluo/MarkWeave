@@ -1,9 +1,37 @@
 import { ipcMain, shell, clipboard } from 'electron'
 import log from 'electron-log'
 import * as plist from 'plist'
+import path from 'path'
+import { isDangerousExecutableFile } from 'common/filesystem/paths'
+
+// `shell.openExternal` hands the URL to the OS. Only allow schemes that are
+// safe to delegate — `file://` would let a compromised renderer launch local
+// binaries, and arbitrary custom schemes can invoke registered protocol
+// handlers with attacker-controlled arguments.
+const SAFE_EXTERNAL_SCHEMES = new Set(['http:', 'https:', 'mailto:'])
+
+const isSafeExternalUrl = (url: unknown): url is string => {
+  if (typeof url !== 'string' || url.length === 0 || url.length > 2048) return false
+  try {
+    const parsed = new URL(url)
+    return SAFE_EXTERNAL_SCHEMES.has(parsed.protocol)
+  } catch {
+    return false
+  }
+}
+
+const isSafeLocalPath = (p: unknown): string | null => {
+  if (typeof p !== 'string' || p.length === 0 || p.includes('\0') || !path.isAbsolute(p)) return null
+  const resolved = path.resolve(p)
+  return resolved
+}
 
 export const registerShellHandlers = (): void => {
   ipcMain.handle('mt::shell::open-external', async(_e, url: string) => {
+    if (!isSafeExternalUrl(url)) {
+      log.warn('shell.openExternal blocked unsafe URL:', url)
+      return false
+    }
     try {
       await shell.openExternal(url)
       return true
@@ -13,6 +41,10 @@ export const registerShellHandlers = (): void => {
     }
   })
   ipcMain.on('mt::shell::open-external', (_e, url: string) => {
+    if (!isSafeExternalUrl(url)) {
+      log.warn('shell.openExternal blocked unsafe URL:', url)
+      return
+    }
     shell.openExternal(url).catch((err) => log.error('shell.openExternal failed:', err))
   })
   ipcMain.on('mt::shell::show-item', (_e, fullPath: string) => {
@@ -23,8 +55,17 @@ export const registerShellHandlers = (): void => {
     }
   })
   ipcMain.handle('mt::shell::open-path', async(_e, fullPath: string) => {
+    const resolved = isSafeLocalPath(fullPath)
+    if (!resolved) {
+      log.warn('shell.openPath blocked invalid path:', fullPath)
+      return 'BLOCKED'
+    }
+    if (isDangerousExecutableFile(resolved)) {
+      log.warn('shell.openPath blocked dangerous executable:', resolved)
+      return 'BLOCKED'
+    }
     try {
-      return await shell.openPath(fullPath)
+      return await shell.openPath(resolved)
     } catch (err) {
       log.error('shell.openPath failed:', err)
       return String(err instanceof Error ? err.message : err)

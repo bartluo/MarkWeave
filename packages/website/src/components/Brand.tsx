@@ -1,10 +1,10 @@
-import { SECTIONS, hash } from '@/lib/sections'
+import Link from 'next/link'
 
 export default function Brand() {
   return (
-    <a className="brand" href={hash(SECTIONS.top)}>
+    <Link className="brand" href="/">
       <img className="mark" src="/assets/logo.png" alt="MarkWeave logo" width={28} height={28} />
       MarkWeave
-    </a>
+    </Link>
   )
 }

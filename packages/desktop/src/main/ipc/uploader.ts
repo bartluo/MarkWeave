@@ -1,6 +1,6 @@
 import path from 'path'
 import { tmpdir } from 'os'
-import { exec, execFile } from 'child_process'
+import { execFile } from 'child_process'
 import fs from 'fs-extra'
 import { ipcMain } from 'electron'
 import commandExists from 'command-exists'
@@ -87,13 +87,30 @@ const parsePicgoOutput = (text: unknown): string | null => {
   return null
 }
 
+// Windows: picgo usually resolves to a `.cmd` shim, and recent Node versions
+// (CVE-2024-27980 hardening) refuse to spawn `.cmd`/`.bat` without a shell.
+// Enabling a shell re-introduces injection risk, so it is only allowed when
+// the path is free of cmd.exe metacharacters.
+const WIN_SHELL_METACHARS = /[&|<>^%"`\n\r!]/
+
 const uploadByPicgo = (localPath: string): Promise<string> =>
   new Promise((resolve, reject) => {
     const cmd = resolvePicgoBinary()
     if (!cmd) return reject(new Error('PicGo command not found in PATH'))
-    exec(
-      `${cmd} u "${localPath}"`,
-      { env: { ...process.env, PATH: buildPreferredPathEnv() } },
+    // Use execFile with an argument array — never interpolate the path into a
+    // shell command string (`exec`), which allowed command injection via
+    // crafted file names.
+    const isCmdShim = process.platform === 'win32' && /\.(cmd|bat)$/i.test(cmd)
+    if (isCmdShim && WIN_SHELL_METACHARS.test(localPath)) {
+      return reject(new Error('PicGo upload rejected: unsafe characters in path'))
+    }
+    execFile(
+      cmd,
+      ['u', localPath],
+      {
+        shell: isCmdShim,
+        env: { ...process.env, PATH: buildPreferredPathEnv() }
+      },
       (err, stdout, stderr) => {
         if (err) return reject(err)
         const text = String(stdout || '') + (stderr ? `\n${String(stderr)}` : '')
@@ -172,16 +189,85 @@ interface UploadRequest {
   preferences: { currentUploader: string; cliScript: string }
 }
 
-export const registerUploaderHandlers = (): void => {
+type UploaderPreferenceSource = () => {
+  currentUploader: string
+  cliScript: string
+}
+
+export const registerUploaderHandlers = (getPreferences?: UploaderPreferenceSource): void => {
   ipcMain.handle('mt::uploader::upload', async(_event, req: UploadRequest) => {
+    if (!req || typeof req !== 'object') {
+      throw new Error('Invalid upload request')
+    }
     const { pathname, image, isPath, preferences } = req
+    if (!preferences || typeof preferences !== 'object' || typeof preferences.currentUploader !== 'string') {
+      throw new Error('Invalid upload preferences')
+    }
+    if (preferences.currentUploader !== 'picgo' && preferences.currentUploader !== 'cliScript') {
+      throw new Error('Unsupported uploader')
+    }
+    // The uploader configuration must come from the saved main-process
+    // preferences, not from the renderer, so a compromised renderer cannot
+    // point us at an arbitrary executable or switch upload providers.
+    const saved = getPreferences?.()
+    if (saved) {
+      if (
+        preferences.currentUploader !== saved.currentUploader ||
+        (preferences.currentUploader === 'cliScript' &&
+          typeof preferences.cliScript === 'string' &&
+          preferences.cliScript !== saved.cliScript)
+      ) {
+        throw new Error('Upload preference does not match saved configuration')
+      }
+    } else if (
+      preferences.currentUploader === 'cliScript' &&
+      (typeof preferences.cliScript !== 'string' ||
+        !path.isAbsolute(preferences.cliScript) ||
+        preferences.cliScript.includes('\0'))
+    ) {
+      throw new Error('Invalid custom upload script path')
+    }
     if (isPath) {
+      if (
+        typeof pathname !== 'string' ||
+        pathname.length === 0 ||
+        typeof image !== 'string'
+      ) {
+        throw new Error('Invalid upload path request')
+      }
+      if (pathname.includes('\0') || image.includes('\0')) {
+        throw new Error('Invalid upload path: contains NUL byte')
+      }
       const dir = path.dirname(pathname)
-      const imagePath = path.resolve(dir, image as string)
+      // Reduce the image reference to a single filename so `../` cannot
+      // escape the current document's directory.
+      const imageName = image.split(/[\\/]+/).pop() ?? ''
+      if (!imageName || imageName === '.' || imageName === '..') {
+        throw new Error('Invalid upload image name')
+      }
+      const imagePath = path.resolve(dir, imageName)
       const isImg = isImageFile(imagePath)
       if (!isImg) return image
       return uploadFromPath(imagePath, preferences)
     }
-    return uploadFromBuffer(image as BufferImagePayload, preferences)
+    if (
+      !image ||
+      typeof image !== 'object' ||
+      !('data' in image) ||
+      !('name' in image)
+    ) {
+      throw new Error('Invalid upload buffer request')
+    }
+    const payload = image as BufferImagePayload
+    if (
+      !(payload.data instanceof Uint8Array) &&
+      !Array.isArray(payload.data)
+    ) {
+      throw new Error('Invalid upload buffer data')
+    }
+    if (typeof payload.name !== 'string' || payload.name.includes('\0')) {
+      throw new Error('Invalid upload buffer name')
+    }
+    return uploadFromBuffer(payload, preferences)
   })
 }

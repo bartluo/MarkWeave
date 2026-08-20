@@ -1,4 +1,3 @@
-import crypto from 'node:crypto'
 import keytar from 'keytar'
 import Store from 'electron-store'
 import log from 'electron-log'
@@ -7,9 +6,10 @@ const KEYTAR_SERVICE = 'markweave'
 const KEYTAR_ACCOUNT_ACCESS = 'access-token'
 const KEYTAR_ACCOUNT_REFRESH = 'refresh-token'
 
+// Only non-sensitive metadata is persisted to disk. Tokens themselves live in
+// memory plus the OS keychain (keytar) — never in the plaintext electron-store
+// file, which any local process can read.
 interface TokenStoreData {
-  accessToken?: string
-  refreshToken?: string
   expiresAt?: number // epoch ms
   provider?: string
   userId?: string
@@ -17,17 +17,47 @@ interface TokenStoreData {
 
 class TokenStore {
   private store: Store<TokenStoreData>
+  private accessToken?: string
+  private refreshToken?: string
+  private migration: Promise<void>
 
   constructor() {
     this.store = new Store<TokenStoreData>({ name: 'auth-tokens' })
+    this.migration = this.migrateLegacyPlaintextTokens()
+  }
+
+  /** Resolves once the legacy plaintext migration finished (or was skipped). */
+  async migrationReady(): Promise<void> {
+    await this.migration
+  }
+
+  // Older versions wrote the raw tokens into the electron-store JSON. Migrate
+  // them into keytar once, then wipe the plaintext copies from disk. The
+  // plaintext is only deleted after keytar confirms the write, so a keychain
+  // failure cannot destroy the user's session.
+  private async migrateLegacyPlaintextTokens(): Promise<void> {
+    const legacy = this.store as unknown as Store<Record<string, unknown>>
+    const legacyAccess = legacy.get('accessToken')
+    const legacyRefresh = legacy.get('refreshToken')
+    if (typeof legacyAccess !== 'string' || typeof legacyRefresh !== 'string') return
+    try {
+      await keytar.setPassword(KEYTAR_SERVICE, KEYTAR_ACCOUNT_ACCESS, legacyAccess)
+      await keytar.setPassword(KEYTAR_SERVICE, KEYTAR_ACCOUNT_REFRESH, legacyRefresh)
+      this.accessToken = legacyAccess
+      this.refreshToken = legacyRefresh
+      legacy.delete('accessToken')
+      legacy.delete('refreshToken')
+    } catch (err) {
+      log.warn('legacy token migration to keytar failed; plaintext kept for retry:', err)
+    }
   }
 
   getAccessToken(): string | undefined {
-    return this.store.get('accessToken')
+    return this.accessToken
   }
 
   getRefreshToken(): string | undefined {
-    return this.store.get('refreshToken')
+    return this.refreshToken
   }
 
   getExpiresAt(): number | undefined {
@@ -49,10 +79,9 @@ class TokenStore {
 
   async saveTokens(accessToken: string, refreshToken: string, expiresInSeconds: number): Promise<void> {
     const expiresAt = Date.now() + expiresInSeconds * 1000
-    this.store.set('accessToken', accessToken)
-    this.store.set('refreshToken', refreshToken)
+    this.accessToken = accessToken
+    this.refreshToken = refreshToken
     this.store.set('expiresAt', expiresAt)
-    // Also persist in keytar for secure storage
     try {
       await keytar.setPassword(KEYTAR_SERVICE, KEYTAR_ACCOUNT_ACCESS, accessToken)
       await keytar.setPassword(KEYTAR_SERVICE, KEYTAR_ACCOUNT_REFRESH, refreshToken)
@@ -75,8 +104,8 @@ class TokenStore {
   }
 
   async clearTokens(): Promise<void> {
-    this.store.delete('accessToken')
-    this.store.delete('refreshToken')
+    this.accessToken = undefined
+    this.refreshToken = undefined
     this.store.delete('expiresAt')
     this.store.delete('userId')
     this.store.delete('provider')
@@ -88,14 +117,25 @@ class TokenStore {
     }
   }
 
-  /** Restore tokens from keytar (more secure, survives app restart) */
+  /**
+   * Restore tokens from keytar (secure storage, survives app restart).
+   * The real expiration is taken from the persisted metadata; when it is
+   * missing we do NOT fabricate a fresh validity window — the tokens are
+   * restored so a refresh can be attempted, but are treated as expired.
+   */
   async restoreFromKeytar(): Promise<boolean> {
     try {
       const accessToken = await keytar.getPassword(KEYTAR_SERVICE, KEYTAR_ACCOUNT_ACCESS)
       const refreshToken = await keytar.getPassword(KEYTAR_SERVICE, KEYTAR_ACCOUNT_REFRESH)
       if (accessToken && refreshToken) {
-        const expiresIn = 7 * 24 * 60 * 60 // 7 days default
-        await this.saveTokens(accessToken, refreshToken, expiresIn)
+        this.accessToken = accessToken
+        this.refreshToken = refreshToken
+        const expiresAt = this.store.get('expiresAt')
+        if (!expiresAt || expiresAt <= Date.now()) {
+          // Expired or unknown — mark expired; the refresh-token flow may
+          // still recover the session.
+          this.store.set('expiresAt', 0)
+        }
         return true
       }
     } catch (err) {

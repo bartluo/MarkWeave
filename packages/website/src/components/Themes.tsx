@@ -26,25 +26,24 @@ export default function Themes() {
         <div className="split rev">
           <div className="split-text">
             <div className="sec-head reveal">
-              <span className="kicker">Themes</span>
-              <h2 className="sec-title">Make it yours.</h2>
+              <span className="kicker">主题</span>
+              <h2 className="sec-title">界面随你定制。</h2>
               <p className="sec-desc">
-                33 built-in themes, light and dark. Every one is just CSS — fork a favorite or write
-                your own.
+                33 款内置主题，浅色深色都齐全。每个主题本质上都是 CSS，可以改样式，也可以从零写一套。
               </p>
             </div>
             <div className="feat-list">
               <FeatItem
                 delay="d1"
                 icon={<SunIcon />}
-                title="Light & dark, instantly"
-                description="Switch with a keystroke, or follow your system."
+                title="浅色 / 深色一键切换"
+                description="快捷键切换，也可以跟随系统外观。"
               />
               <FeatItem
                 delay="d2"
                 icon={<CodeIcon />}
-                title="Author with plain CSS"
-                description="No proprietary format. Know CSS? You can theme it."
+                title="用普通 CSS 自定义"
+                description="没有私有格式，会 CSS 就能做主题。"
               />
             </div>
           </div>
@@ -78,7 +77,7 @@ export default function Themes() {
               ))}
             </div>
             <div className="theme-more reveal d1">
-              <span>+27 more built-in themes</span>
+              <span>+27 款更多内置主题</span>
             </div>
           </div>
         </div>

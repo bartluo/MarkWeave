@@ -1,24 +1,11 @@
 import type { Metadata, Viewport } from 'next'
-import { Geist, Geist_Mono } from 'next/font/google'
 import { DEFAULT_THEME, THEME_STORAGE_KEY } from '@/lib/sections'
 import './globals.css'
 
-const geistSans = Geist({
-  subsets: ['latin'],
-  variable: '--font-geist-sans',
-  display: 'swap'
-})
-
-const geistMono = Geist_Mono({
-  subsets: ['latin'],
-  variable: '--font-geist-mono',
-  display: 'swap'
-})
-
 const SITE_URL = 'https://markweave.app'
-const TITLE = 'MarkWeave — The Markdown editor that gets out of your way'
+const TITLE = 'MarkWeave — 跨平台 Markdown 编辑器'
 const DESCRIPTION =
-  'A free, open-source, real-time preview Markdown editor for macOS, Windows and Linux. Beautiful typography, 33 built-in themes, math, diagrams, footnotes — all rendered live.'
+  'MarkWeave 是一款开源、免费、跨平台的 Markdown 编辑器，支持实时渲染、数学公式、流程图、主题定制与 PDF/HTML 导出。'
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
@@ -29,26 +16,25 @@ export const metadata: Metadata = {
   description: DESCRIPTION,
   applicationName: 'MarkWeave',
   keywords: [
-    'markdown editor',
-    'WYSIWYG markdown',
-    'CommonMark',
-    'GitHub Flavored Markdown',
-    'GFM',
+    'Markdown 编辑器',
+    'MarkWeave',
+    '实时预览',
+    '所见即所得',
+    'Markdown',
     'KaTeX',
     'Mermaid',
     'PlantUML',
-    'Electron',
     'macOS',
     'Windows',
     'Linux'
   ],
-  authors: [{ name: 'Ran Luo', url: 'https://github.com/Jocs' }],
-  creator: 'Ran Luo',
+  authors: [{ name: 'MarkWeave Team', url: 'https://github.com/markweave/markweave' }],
+  creator: 'MarkWeave Team',
   alternates: { canonical: '/' },
   icons: { icon: '/favicon.png' },
   openGraph: {
     type: 'website',
-    locale: 'en_US',
+    locale: 'zh_CN',
     url: SITE_URL,
     siteName: 'MarkWeave',
     title: TITLE,
@@ -90,7 +76,7 @@ const themeBootstrap = `(function(){try{var t=localStorage.getItem(${JSON.string
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" data-theme={DEFAULT_THEME} className={`${geistSans.variable} ${geistMono.variable}`}>
+    <html lang="zh-CN" data-theme={DEFAULT_THEME}>
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeBootstrap }} />
       </head>

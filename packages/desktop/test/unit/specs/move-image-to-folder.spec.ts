@@ -1,11 +1,13 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import path from 'path'
+import nodePath from 'path'
 import { moveImageToFolder } from '@/util/fileSystem'
 
 // moveImageToFolder relies on the preload contextBridge surface (window.path,
-// window.fileUtils). Stub them with the real node `path` and in-memory fakes so
-// the relative-path persistence logic can be exercised (real window.crypto is
-// used for the content hash).
+// window.fileUtils). The preload exposes POSIX-style `pathe`, so stub them
+// with node's posix path and in-memory fakes so the relative-path persistence
+// logic behaves identically on Windows and POSIX (real window.crypto is used
+// for the content hash).
+const path = nodePath.posix
 const copy = vi.fn((_src: string, _dest: string) => Promise.resolve())
 const writeFile = vi.fn(() => Promise.resolve())
 

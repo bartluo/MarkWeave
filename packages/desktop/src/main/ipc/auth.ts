@@ -47,10 +47,16 @@ export const registerAuthHandlers = (): void => {
   })
 
   ipcMain.handle('mt::auth::start-oauth', (_e, provider: 'google' | 'github') => {
+    if (provider !== 'google' && provider !== 'github') {
+      return { codeVerifier: '', authUrl: '', state: '' }
+    }
     return getAuthManager().startOAuth(provider)
   })
 
   ipcMain.handle('mt::auth::oauth-callback', (_e, code: string, state: string, provider: 'google' | 'github') => {
+    if (provider !== 'google' && provider !== 'github') {
+      return { ok: false, error: 'OAUTH_FAILED' }
+    }
     return getAuthManager().handleOAuthCallback(code, state, provider)
   })
 

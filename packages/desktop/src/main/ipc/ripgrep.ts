@@ -431,13 +431,20 @@ interface RipgrepRequest {
 
 export const registerRipgrepHandlers = (): void => {
   ipcMain.handle('mt::rg::start', (event, req: RipgrepRequest) => {
+    if (!req || typeof req !== 'object') return false
     const { searchId, mode, directories, pattern, options } = req
+    // Validate renderer-supplied input before spawning a child process.
+    if (typeof searchId !== 'string' || searchId.length === 0 || searchId.length > 128) return false
+    if (!Array.isArray(directories) || directories.length === 0) return false
+    if (!directories.every((d) => typeof d === 'string' && d.length > 0 && !d.includes('\0'))) return false
+    if (mode !== 'files' && typeof pattern !== 'string') return false
     cleanupAtSenderDestroy(event.sender)
     if (mode === 'files') startFileSearch(event.sender, searchId, directories, options || {})
     else startTextSearch(event.sender, searchId, directories, pattern, options || {})
     return true
   })
   ipcMain.on('mt::rg::cancel', (_event, searchId: string) => {
+    if (typeof searchId !== 'string') return
     const entry = activeSearches.get(searchId)
     if (entry) entry.cancel()
   })

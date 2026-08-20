@@ -1,6 +1,5 @@
 import crypto from 'node:crypto'
 import { Hono } from 'hono'
-import { randomUUID } from 'node:crypto'
 import { AlipaySdk } from 'alipay-sdk'
 import type { AlipaySdkCommonResult } from 'alipay-sdk'
 import { Creem } from 'creem'
@@ -9,7 +8,6 @@ import {
   verifyWechatV3HmacSignature,
   buildWechatV3SignInput,
   randomString,
-  timestamp,
   parseWechatXmlResponse,
   buildWechatXml,
   codeUrlToQrUrl
@@ -45,7 +43,6 @@ function toOrderResponse(o: OrderRow) {
     plan: o.plan,
     amountCents: o.amount_cents,
     currency: o.currency,
-    email: o.customer_email,
     licenseKey: o.license_key ?? undefined,
     createdAt: o.created_at,
     paidAt: o.license_issued_at ?? undefined
@@ -82,7 +79,7 @@ export const createApp = (store: Store, cfg: PaymentServerConfig, plans: PlanCon
   )
 
   // ── 创建订单 ──
-  app.post('/v1/orders', async (c) => {
+  app.post('/v1/orders', async(c) => {
     const body = await c.req.json().catch(() => null)
     const parsed = createOrderSchema.safeParse(body)
     if (!parsed.success) return c.json({ error: 'BAD_REQUEST' }, 400)
@@ -106,9 +103,11 @@ export const createApp = (store: Store, cfg: PaymentServerConfig, plans: PlanCon
     }
 
     const paymentMethod: PaymentMethod =
-      method === 'wechat' ? 'wechat'
-      : method === 'creem' ? 'creem'
-      : 'alipay'
+      method === 'wechat'
+        ? 'wechat'
+        : method === 'creem'
+          ? 'creem'
+          : 'alipay'
 
     const order = store.createOrder({
       customer_email: email,
@@ -173,7 +172,7 @@ export const createApp = (store: Store, cfg: PaymentServerConfig, plans: PlanCon
   })
 
   // ── 支付宝异步通知 ──
-  app.post('/v1/webhooks/alipay', async (c) => {
+  app.post('/v1/webhooks/alipay', async(c) => {
     if (!alipaySdk || !cfg.alipayAlipayPublicKey) {
       return c.json({ result: 'failure' }, 400)
     }
@@ -182,6 +181,10 @@ export const createApp = (store: Store, cfg: PaymentServerConfig, plans: PlanCon
     const success = alipaySdk.checkNotifySign(params)
     if (!success) {
       console.warn('[alipay] signature verification failed')
+      return c.json({ result: 'failure' })
+    }
+    if (params.get('app_id') !== cfg.alipayAppId) {
+      console.warn('[alipay] app_id mismatch')
       return c.json({ result: 'failure' })
     }
     const tradeStatus = params.get('trade_status')
@@ -196,6 +199,11 @@ export const createApp = (store: Store, cfg: PaymentServerConfig, plans: PlanCon
     if (!order || order.status === 'licensed' || order.status === 'paid') {
       return c.json({ result: 'success' })
     }
+    const paidAmount = Math.round(Number(params.get('total_amount')) * 100)
+    if (!Number.isFinite(paidAmount) || paidAmount !== order.amount_cents) {
+      console.warn('[alipay] amount mismatch for order', order.id)
+      return c.json({ result: 'failure' })
+    }
     store.updateOrder(order.id, {
       status: 'paid',
       alipay_trade_no: tradeNo,
@@ -207,22 +215,42 @@ export const createApp = (store: Store, cfg: PaymentServerConfig, plans: PlanCon
   })
 
   // ── 微信支付异步通知 ──
-  app.post('/v1/webhooks/wechat', async (c) => {
+  app.post('/v1/webhooks/wechat', async(c) => {
     const xmlBody = await c.req.text()
     const result = parseWechatXmlResponse(xmlBody)
     if (!result.out_trade_no || !result.prepay_id) {
       return wechatFailResponse()
     }
     // v3 验签：Wechatpay-Signature 头包含 algorithm, serial, nonce, timestamp, signature
+    // 必须验签——缺少签名头直接拒绝，否则任何人可伪造支付成功通知。
     const wechatpaySig = c.req.header('Wechatpay-Signature') ?? ''
-    if (wechatpaySig) {
-      const ts = c.req.header('Wechatpay-Timestamp') ?? ''
-      const nonce = c.req.header('Wechatpay-Nonce') ?? ''
-      const sigInput = buildWechatV3SignInput(ts, nonce, xmlBody)
+    if (!wechatpaySig || !cfg.wechatApiKey) {
+      console.warn('[wechat] missing signature header or API key')
+      return wechatFailResponse()
+    }
+    const ts = c.req.header('Wechatpay-Timestamp') ?? ''
+    const nonce = c.req.header('Wechatpay-Nonce') ?? ''
+    const sigInput = buildWechatV3SignInput(ts, nonce, xmlBody)
+    try {
       if (!verifyWechatV3HmacSignature(sigInput, wechatpaySig, cfg.wechatApiKey)) {
         console.warn('[wechat] signature mismatch')
         return wechatFailResponse()
       }
+    } catch (err) {
+      console.warn('[wechat] signature verification error:', err)
+      return wechatFailResponse()
+    }
+    const tsNum = Number(ts)
+    if (!Number.isFinite(tsNum) || Math.abs(Date.now() / 1000 - tsNum) > 300) {
+      console.warn('[wechat] stale or invalid timestamp')
+      return wechatFailResponse()
+    }
+    if (
+      (cfg.wechatAppId && result.appid !== cfg.wechatAppId) ||
+      (cfg.wechatMchId && result.mch_id !== cfg.wechatMchId)
+    ) {
+      console.warn('[wechat] appid/mch_id mismatch')
+      return wechatFailResponse()
     }
     if (result.result_code !== 'SUCCESS') {
       return wechatFailResponse()
@@ -230,6 +258,10 @@ export const createApp = (store: Store, cfg: PaymentServerConfig, plans: PlanCon
     const order = store.getOrderWechat(result.prepay_id) ?? store.getOrderById(result.out_trade_no)
     if (!order || order.status === 'licensed' || order.status === 'paid') {
       return wechatSuccessResponse()
+    }
+    if (Number(result.total_fee) !== order.amount_cents) {
+      console.warn('[wechat] amount mismatch for order', order.id)
+      return wechatFailResponse()
     }
     store.updateOrder(order.id, {
       status: 'paid',
@@ -241,22 +273,27 @@ export const createApp = (store: Store, cfg: PaymentServerConfig, plans: PlanCon
   })
 
   // ── Creem 异步通知 ──
-  app.post('/v1/webhooks/creem', async (c) => {
+  app.post('/v1/webhooks/creem', async(c) => {
     const rawBody = await c.req.text()
     const sigHeader = c.req.header('creem-signature') ?? ''
-    // 必须验签：配置了 secret 就必须提供签名，否则拒绝
-    if (cfg.creemWebhookSecret && !sigHeader) {
+    // 必须验签：未配置 secret 时拒绝处理（否则无法验证来源），缺少签名头同样拒绝。
+    if (!cfg.creemWebhookSecret) {
+      console.warn('[creem] webhook secret not configured, rejecting')
+      return c.json({ error: 'NOT_CONFIGURED' }, 500)
+    }
+    if (!sigHeader) {
       return c.json({ error: 'MISSING_SIGNATURE' }, 400)
     }
-    if (sigHeader) {
-      const expected = crypto
-        .createHmac('sha256', cfg.creemWebhookSecret)
-        .update(rawBody, 'utf8')
-        .digest('hex')
-      if (!crypto.timingSafeEqual(Buffer.from(sigHeader, 'utf8'), Buffer.from(expected, 'utf8'))) {
-        console.warn('[creem] webhook signature mismatch')
-        return c.json({ error: 'INVALID_SIGNATURE' }, 400)
-      }
+    const expected = crypto
+      .createHmac('sha256', cfg.creemWebhookSecret)
+      .update(rawBody, 'utf8')
+      .digest('hex')
+    // timingSafeEqual throws on length mismatch — compare lengths first.
+    const sigBuf = Buffer.from(sigHeader, 'utf8')
+    const expBuf = Buffer.from(expected, 'utf8')
+    if (sigBuf.length !== expBuf.length || !crypto.timingSafeEqual(sigBuf, expBuf)) {
+      console.warn('[creem] webhook signature mismatch')
+      return c.json({ error: 'INVALID_SIGNATURE' }, 400)
     }
     let event: { type: string; data?: Record<string, unknown> }
     try {
@@ -317,8 +354,18 @@ export const createApp = (store: Store, cfg: PaymentServerConfig, plans: PlanCon
   })
 
   // ── 管理员接口 ──
-  app.use('/v1/admin/*', async (c, next) => {
-    if (!cfg.licenseAdminKey || c.req.header('Authorization') !== `Bearer ${cfg.licenseAdminKey}`) {
+  app.use('/v1/admin/*', async(c, next) => {
+    const header = c.req.header('Authorization')
+    // Constant-time comparison to prevent timing attacks on the admin key.
+    const ok = cfg.licenseAdminKey &&
+      header?.startsWith('Bearer ') &&
+      (() => {
+        const a = Buffer.from(header.slice(7), 'utf8')
+        const b = Buffer.from(cfg.licenseAdminKey, 'utf8')
+        return a.length === b.length &&
+          crypto.timingSafeEqual(a, b)
+      })()
+    if (!ok) {
       return c.json({ error: 'UNAUTHORIZED' }, 401)
     }
     await next()
@@ -330,7 +377,7 @@ export const createApp = (store: Store, cfg: PaymentServerConfig, plans: PlanCon
     return c.json({ orders: store.listOrders(status ?? undefined, limit) })
   })
 
-  app.post('/v1/admin/orders/:orderId/refund', async (c) => {
+  app.post('/v1/admin/orders/:orderId/refund', async(c) => {
     const order = store.getOrderById(c.req.param('orderId'))
     if (!order) return c.json({ error: 'NOT_FOUND' }, 404)
     if (order.status !== 'paid' && order.status !== 'licensed') {
@@ -428,9 +475,11 @@ async function createCreemCheckout(
   paymentPlan: PaymentPlan
 ): Promise<{ checkoutUrl?: string; checkoutId?: string; requestId?: string; error?: string }> {
   try {
-    const productId = paymentPlan.id === 'pro' ? cfg.creemProProductId
-      : paymentPlan.id === 'commercial' ? cfg.creemCommercialProductId
-      : cfg.creemTrialProductId
+    const productId = paymentPlan.id === 'pro'
+      ? cfg.creemProProductId
+      : paymentPlan.id === 'commercial'
+        ? cfg.creemCommercialProductId
+        : cfg.creemTrialProductId
     if (!productId) {
       console.error(`[creem] missing product ID for plan: ${paymentPlan.id}`)
       return { error: 'CREEM_PRODUCT_NOT_CONFIGURED' }

@@ -3,10 +3,10 @@ import { revealClass, type RevealDelay } from '@/lib/sections'
 type Stat = { value: string; label: string; delay?: RevealDelay }
 
 const STATS: Stat[] = [
-  { value: '56.6k', label: 'GitHub stars' },
-  { value: '146', label: 'Contributors', delay: 'd1' },
-  { value: '3', label: 'Platforms supported', delay: 'd2' },
-  { value: 'MIT', label: 'Free & open source', delay: 'd3' }
+  { value: '56.6k', label: 'GitHub Stars' },
+  { value: '146', label: '社区贡献者', delay: 'd1' },
+  { value: '3', label: '支持平台', delay: 'd2' },
+  { value: 'MIT', label: '开源免费', delay: 'd3' }
 ]
 
 export default function Stats() {

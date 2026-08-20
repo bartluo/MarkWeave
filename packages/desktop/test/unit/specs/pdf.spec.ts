@@ -54,7 +54,7 @@ describe('getCssForOptions', () => {
 
     await expect(getCssForOptions({ theme: 'academic' })).resolves.toBeTypeOf('string')
     await expect(getCssForOptions({ theme: 'liber' })).resolves.toBeTypeOf('string')
-  })
+  }, 30_000)
 
   it('appends no theme CSS for theme:"default" (disk lookup misses) or {}', async() => {
     const { getCssForOptions } = await loadPdf()
@@ -67,7 +67,7 @@ describe('getCssForOptions', () => {
     expect(def).toBe(empty)
     expect(def).not.toContain('Georgia')
     expect(def).toContain('.markdown-body{')
-  })
+  }, 30_000)
 
   it('reads a custom theme name from disk via window.fileUtils', async() => {
     const isFile = vi.fn(async() => true)

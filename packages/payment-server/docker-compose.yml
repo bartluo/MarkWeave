@@ -1,13 +1,30 @@
-version: '3.8'
 services:
+  # license-server is referenced by depends_on and LICENSE_SERVER_URL;
+  # its compose file lives in packages/license-server/.
+  license-server:
+    build:
+      context: ../..
+      dockerfile: packages/license-server/Dockerfile
+    restart: unless-stopped
+    env_file: ../license-server/.env
+    volumes:
+      - ../license-server/data:/app/packages/license-server/data
+
   payment-server:
-    build: .
+    build:
+      context: ../..
+      dockerfile: packages/payment-server/Dockerfile
+    restart: unless-stopped
     ports:
       - "127.0.0.1:3220:3220"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     environment:
       - PORT=3220
       - LICENSE_SERVER_URL=http://license-server:3210
       - LICENSE_ADMIN_KEY=${LICENSE_ADMIN_KEY}
+      - AUTH_SERVER_URL=${AUTH_SERVER_URL:-http://host.docker.internal:3230}
+      - AUTH_ADMIN_KEY=${AUTH_ADMIN_KEY}
       - ALIPAY_APP_ID=${ALIPAY_APP_ID}
       - ALIPAY_PRIVATE_KEY=${ALIPAY_PRIVATE_KEY}
       - ALIPAY_ALIPAY_PUBLIC_KEY=${ALIPAY_ALIPAY_PUBLIC_KEY}
@@ -17,7 +34,13 @@ services:
       - WECHAT_MCH_ID=${WECHAT_MCH_ID}
       - WECHAT_API_KEY=${WECHAT_API_KEY}
       - WECHAT_NOTIFY_URL=${WECHAT_NOTIFY_URL}
+      - CREEM_API_KEY=${CREEM_API_KEY}
+      - CREEM_WEBHOOK_SECRET=${CREEM_WEBHOOK_SECRET}
+      - CREEM_SERVER=${CREEM_SERVER:-prod}
+      - CREEM_PRODUCT_PRO=${CREEM_PRODUCT_PRO}
+      - CREEM_PRODUCT_COMMERCIAL=${CREEM_PRODUCT_COMMERCIAL}
+      - CREEM_PRODUCT_TRIAL=${CREEM_PRODUCT_TRIAL}
     volumes:
-      - ./data:/app/data
+      - ./data:/app/packages/payment-server/data
     depends_on:
       - license-server

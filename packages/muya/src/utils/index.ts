@@ -41,8 +41,6 @@ export function noop() {}
 
 export const identity = <T>(i: T): T => i;
 
-export const isOdd = (n: number) => Math.abs(n) % 2 === 1;
-
 export const isEven = (n: number) => Math.abs(n) % 2 === 0;
 
 export const isLengthEven = (str = '') => str.length % 2 === 0;

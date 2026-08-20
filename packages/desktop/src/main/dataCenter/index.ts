@@ -53,7 +53,8 @@ class DataCenter extends TypedEmitter<DataCenterEvents> {
       screenshotFolderPath: path.join(this.userDataPath, 'screenshot'),
       webImages: [],
       cloudImages: [],
-      currentUploader: 'picgo'
+      currentUploader: 'picgo',
+      cliScript: ''
     }
 
     if (!this.hasDataCenterFile) {
@@ -64,6 +65,9 @@ class DataCenter extends TypedEmitter<DataCenterEvents> {
       const stored = this.store.get('currentUploader') as string | undefined
       if (stored === 'none' || stored === 'github') {
         this.store.set('currentUploader', 'picgo')
+      }
+      if (typeof this.store.get('cliScript') !== 'string') {
+        this.store.set('cliScript', '')
       }
     }
     this._listenForIpcMain()

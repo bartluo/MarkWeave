@@ -1,9 +1,13 @@
 services:
   license:
-    build: .
+    # The Dockerfile expects the repo root as build context so the
+    # workspace:* dependency on @markweave/license-core resolves.
+    build:
+      context: ../..
+      dockerfile: packages/license-server/Dockerfile
     restart: unless-stopped
     ports:
       - "127.0.0.1:3210:3210"
     env_file: .env
     volumes:
-      - ./data:/app/data
+      - ./data:/app/packages/license-server/data

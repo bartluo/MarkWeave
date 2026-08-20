@@ -84,9 +84,6 @@ if (!process.mas && process.env.NODE_ENV !== 'development') {
   }
 }
 
-// Register sandbox-safe IPC handlers used by the contextBridge preload
-registerSandboxIpcHandlers()
-
 // 启动即校验许可证：恢复本地状态 + 触发在线验证 + 24h 心跳常驻（防盗版核心）
 getLicenseManager().start()
 
@@ -119,6 +116,15 @@ try {
   }
   process.exit(1)
 }
+
+// Register sandbox-safe IPC handlers used by the contextBridge preload.
+// Uploader settings are read from the saved main-process preferences so the
+// renderer can never substitute its own executable path.
+registerSandboxIpcHandlers(() => ({
+  currentUploader: (accessor.dataCenter.store.get('currentUploader') as string | undefined) ?? 'picgo',
+  cliScript: (accessor.dataCenter.store.get('cliScript') as string | undefined) ?? ''
+}))
+
 const appController = new App(accessor, args as unknown as { _: string[] })
 appController.init()
 

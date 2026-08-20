@@ -38,6 +38,11 @@ class LicenseManager {
   private allowOfflineActivation: boolean
   private heartbeatTimer?: NodeJS.Timeout
   private state: LicenseState
+  // Serializes async state transitions (activate/refresh/deactivate). Without
+  // this, a heartbeat `refresh()` racing a user-triggered `activate()` could
+  // interleave their `setState` calls and persist an inconsistent license
+  // state (e.g. a stale activationId overwriting a fresh one).
+  private opChain: Promise<unknown> = Promise.resolve()
 
   constructor(opts?: LicenseManagerOptions) {
     this.publicKey = crypto.createPublicKey(ED25519_PUBLIC_KEY_PEM)
@@ -49,6 +54,12 @@ class LicenseManager {
     this.state = { status: 'none', localVerified: false, updatedAt: Date.now() }
     // Restore is async due to keytar; fire-and-forget from constructor.
     void this.restoreState()
+  }
+
+  private enqueue<T>(op: () => Promise<T>): Promise<T> {
+    const run = this.opChain.then(op, op)
+    this.opChain = run.catch(() => undefined)
+    return run
   }
 
   // ---------- 本地持久化 ----------
@@ -178,6 +189,10 @@ class LicenseManager {
   }
 
   async activate(rawKey: string): Promise<ActivateResult> {
+    return this.enqueue(() => this.activateInternal(rawKey))
+  }
+
+  private async activateInternal(rawKey: string): Promise<ActivateResult> {
     const local = this.verifyOffline(rawKey)
     if (!local.ok) {
       this.setState({ status: 'invalid', localVerified: false, updatedAt: Date.now(), error: local.error })
@@ -222,6 +237,10 @@ class LicenseManager {
   }
 
   async refresh(): Promise<LicenseState> {
+    return this.enqueue(() => this.refreshInternal())
+  }
+
+  private async refreshInternal(): Promise<LicenseState> {
     const rawKey = (await keytar.getPassword(KEYTAR_SERVICE, KEYTAR_ACCOUNT)) ?? ''
     const activationId = this.state.license?.activationId
     if (this.state.status !== 'activated' || !rawKey || !activationId) return this.state
@@ -252,6 +271,10 @@ class LicenseManager {
   }
 
   async deactivate(): Promise<{ ok: boolean; error?: string }> {
+    return this.enqueue(() => this.deactivateInternal())
+  }
+
+  private async deactivateInternal(): Promise<{ ok: boolean; error?: string }> {
     const activationId = this.state.license?.activationId
     if (activationId) {
       await this.postJson<unknown>('/v1/deactivate', { activationId } as DeactivateRequest)

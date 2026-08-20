@@ -13,6 +13,18 @@ export default function sitemap(): MetadataRoute.Sitemap {
       priority: 1
     },
     {
+      url: SITE + '/download',
+      lastModified: now,
+      changeFrequency: 'weekly',
+      priority: 0.9
+    },
+    {
+      url: SITE + '/pricing',
+      lastModified: now,
+      changeFrequency: 'weekly',
+      priority: 0.9
+    },
+    {
       url: SITE + '/docs',
       lastModified: now,
       changeFrequency: 'weekly',

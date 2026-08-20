@@ -294,6 +294,9 @@ export const usePreferencesStore = defineStore('preferences', {
     },
 
     SET_USER_DATA({ type, value }: SetUserDataPayload): void {
+      // Keep the local store in sync with the main process data center so
+      // uploads and other consumers read the value the user just saved.
+      ;(this as unknown as Record<string, unknown>)[type as string] = value
       window.electron.ipcRenderer.send('mt::set-user-data', { [type]: value })
     },
 

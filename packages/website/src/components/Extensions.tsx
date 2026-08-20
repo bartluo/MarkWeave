@@ -21,17 +21,17 @@ type Card = {
 const CARDS: Card[] = [
   {
     icon: <TableIcon />,
-    title: 'Tables',
-    description: 'Build them visually, or pipe them in with Markdown.',
+    title: '表格',
+    description: '可视化搭建，或用 Markdown 直接书写。',
     mini: (
       <div className="tbl">
-        <span className="h">Feature</span>
-        <span className="h">Free</span>
+        <span className="h">功能</span>
+        <span className="h">免费</span>
         <span className="h">Pro</span>
-        <span>Preview</span>
+        <span>实时预览</span>
         <span>✓</span>
         <span>✓</span>
-        <span>Themes</span>
+        <span>主题</span>
         <span>✓</span>
         <span>✓</span>
       </div>
@@ -39,8 +39,8 @@ const CARDS: Card[] = [
   },
   {
     icon: <MathIcon />,
-    title: 'Math & LaTeX',
-    description: 'KaTeX inline and block math, rendered instantly.',
+    title: '数学公式',
+    description: 'KaTeX 行内与块级公式，即时渲染。',
     delay: 'd1',
     mini: (
       <div className="katex">
@@ -51,36 +51,36 @@ const CARDS: Card[] = [
   },
   {
     icon: <DiagramIcon />,
-    title: 'Diagrams',
-    description: 'Flowcharts and charts via Mermaid, Vega & Vega-Lite.',
+    title: '流程图',
+    description: '支持 Mermaid、Vega 与 Vega-Lite 图表。',
     delay: 'd2',
     mini: (
       <div className="mermaid-flow">
-        <span className="node">Write</span>
+        <span className="node">写作</span>
         <span className="arrow">→</span>
-        <span className="node">Render</span>
+        <span className="node">渲染</span>
         <span className="arrow">→</span>
-        <span className="node">Ship</span>
+        <span className="node">发布</span>
       </div>
     )
   },
   {
     icon: <FootnoteIcon />,
-    title: 'Footnotes',
-    description: 'Two-way reference footnotes that renumber themselves.',
+    title: '脚注',
+    description: '双向引用的脚注，编号自动重排。',
     mini: (
       <>
-        Drafted in 2024.
+        草稿写于 2024 年。
         <sup style={{ color: 'var(--accent)' }}>[1]</sup>
         <br />
-        <span style={{ color: 'var(--muted)' }}>[1]: The year MarkWeave turned ten.</span>
+        <span style={{ color: 'var(--muted)' }}>[1]: MarkWeave 满十周年的那一年。</span>
       </>
     )
   },
   {
     icon: <CodeIcon />,
-    title: 'Code blocks',
-    description: 'Syntax highlighting for hundreds of languages.',
+    title: '代码块',
+    description: '数百种语言的语法高亮。',
     delay: 'd1',
     mini: (
       <>
@@ -94,8 +94,8 @@ const CARDS: Card[] = [
   },
   {
     icon: <FrontmatterIcon />,
-    title: 'Front matter',
-    description: 'YAML, TOML and JSON metadata for blogs and static sites.',
+    title: 'Front Matter',
+    description: '支持 YAML、TOML 和 JSON 元信息，适配博客与静态站点。',
     delay: 'd2',
     mini: (
       <>
@@ -116,10 +116,10 @@ export default function Extensions() {
     <section className="block" id={SECTIONS.extensions}>
       <div className="wrap">
         <div className="sec-head center reveal">
-          <span className="kicker">Markdown, extended</span>
-          <h2 className="sec-title">More than CommonMark.</h2>
+          <span className="kicker">Markdown 扩展</span>
+          <h2 className="sec-title">不止于基础语法。</h2>
           <p className="sec-desc">
-            Tables, math, diagrams, footnotes and front matter — all first-class, all rendered live.
+            表格、公式、图表、脚注与 Front Matter 全部一等支持，全部实时渲染。
           </p>
         </div>
         <div className="grid-3">

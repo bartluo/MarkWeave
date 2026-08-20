@@ -35,7 +35,14 @@ export const useAuthStore = defineStore('auth', {
   actions: {
     async init(): Promise<void> {
       if (!window.auth) return
-      this.status = await window.auth.getStatus()
+      try {
+        this.status = await window.auth.getStatus()
+      } catch (e) {
+        // 初始化失败不能阻断应用启动（app.vue 的 onMounted 会 await 本方法）
+        console.error('auth init failed:', e)
+        this.error = 'INIT_FAILED'
+        return
+      }
       window.auth.onStateChanged((next: AuthStatus) => {
         this.status = next
         this.error = null
@@ -94,6 +101,17 @@ export const useAuthStore = defineStore('auth', {
     async fetchDevices(): Promise<void> {
       if (!window.auth) return
       this.devices = await window.auth.getDevices()
+    },
+
+    async deactivateDevice(deviceId: string): Promise<boolean> {
+      if (!window.auth) return false
+      try {
+        const res = await window.auth.deactivateDevice(deviceId)
+        return res.ok
+      } catch (e) {
+        console.error('deactivateDevice failed:', e)
+        return false
+      }
     },
 
     async linkLicense(licenseKey: string): Promise<boolean> {

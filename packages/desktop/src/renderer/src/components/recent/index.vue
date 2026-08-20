@@ -162,13 +162,14 @@ const openFolder = () => {
       }
 
       & .welcome-btn:not(.primary) {
-        background: var(--floatBgColor);
-        border: 1px solid var(--floatBorderColor);
-        color: var(--editorColor60);
+        background: var(--buttonPrimaryBgColor);
+        border: 1px solid transparent;
+        color: var(--buttonPrimaryFontColor);
 
         &:hover {
-          color: var(--editorColor);
-          border-color: var(--editorColor10);
+          background: var(--buttonPrimaryBgColorHover);
+          color: var(--buttonPrimaryFontColorHover);
+          border-color: transparent;
         }
       }
     }

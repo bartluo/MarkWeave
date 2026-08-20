@@ -1,5 +1,6 @@
 export const SECTIONS = {
   top: 'top',
+  guide: 'guide',
   preview: 'preview',
   extensions: 'extensions',
   themes: 'themes',

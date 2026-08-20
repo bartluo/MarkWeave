@@ -17,7 +17,11 @@ const createRoutes = (envType?: string): RouteRecordRaw[] => {
     {
       path: '/',
       component: App,
-      redirect: (to) => {
+      // vue-router's RouteRecordRaw union requires `children` when a route
+      // carries both `component` and `redirect`; the redirect target is
+      // computed from URL args only, so the callback takes no parameters.
+      children: [],
+      redirect: () => {
         const params = new URLSearchParams(window.location.search)
         const queryType = params.get('type')
         if (queryType?.includes('settings')) {

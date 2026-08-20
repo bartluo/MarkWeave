@@ -212,5 +212,15 @@ export default [
         }
       ]
     }
+  },
+
+  // 11. Server packages: Hono framework handlers use `async (c) =>` which
+  // conflicts with space-before-function-paren:never. Relax the rule there
+  // while keeping the rest of the config intact.
+  {
+    files: ['packages/auth-server/**/*.ts', 'packages/license-server/**/*.ts', 'packages/payment-server/**/*.ts'],
+    rules: {
+      '@stylistic/space-before-function-paren': 'off'
+    }
   }
 ]

@@ -59,11 +59,17 @@ export default function loadImageAsync(
                         const imageContainer = imageText.querySelector(
                             `.${CLASS_NAMES.MU_IMAGE_CONTAINER}`,
                         );
-                        const oldImage = imageContainer!.querySelector('img');
+                        // The container is created synchronously with the inline
+                        // image, but guard anyway — a detached/re-rendered block
+                        // could leave it missing, and the `!` assertion would
+                        // throw and drop the loaded image.
+                        if (!imageContainer)
+                            return;
+                        const oldImage = imageContainer.querySelector('img');
                         if (oldImage)
                             oldImage.remove();
 
-                        imageContainer!.appendChild(img);
+                        imageContainer.appendChild(img);
                         imageText.classList.remove(CLASS_NAMES.MU_IMAGE_LOADING);
                         imageText.classList.add(CLASS_NAMES.MU_IMAGE_SUCCESS);
                         // Tag small images on the first async load — otherwise the class
