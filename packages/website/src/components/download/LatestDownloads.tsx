@@ -1,13 +1,22 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { DOWNLOAD } from '@/lib/downloads'
 import { EXT_LINK } from '@/lib/links'
 import { LinuxIcon, MacIcon, SmartphoneIcon, WindowsIcon } from '@/components/Icons'
 
-type Asset = {
+type DownloadFile = {
   name: string
-  browser_download_url: string
+  url: string
+  size?: number
+}
+
+type DownloadManifest = {
+  version?: string
+  platforms?: {
+    macos?: DownloadFile[]
+    windows?: DownloadFile[]
+    linux?: DownloadFile[]
+  }
 }
 
 type PlatformSpec = {
@@ -16,8 +25,8 @@ type PlatformSpec = {
   file: string
   arch: string
   icon: React.ReactNode
-  match?: RegExp
-  prefer?: RegExp
+  key: keyof NonNullable<DownloadManifest['platforms']> | 'ios'
+  prefer?: (files: DownloadFile[]) => DownloadFile | undefined
   disabled?: boolean
 }
 
@@ -28,8 +37,8 @@ const PLATFORMS: PlatformSpec[] = [
     file: '.dmg / .zip',
     arch: 'Apple Silicon / Intel',
     icon: <MacIcon />,
-    match: /^markweave-mac-(arm64|x64)-.+\.(dmg|zip)$/i,
-    prefer: /\.dmg$/i
+    key: 'macos',
+    prefer: (files) => files.find((f) => f.name.toLowerCase().endsWith('.dmg')) ?? files[0]
   },
   {
     id: 'windows',
@@ -37,8 +46,8 @@ const PLATFORMS: PlatformSpec[] = [
     file: '.exe / .zip',
     arch: 'x64 / ARM64',
     icon: <WindowsIcon />,
-    match: /^markweave-win-(x64|arm64)-.+\.(exe|zip)$/i,
-    prefer: /-setup\.exe$/i
+    key: 'windows',
+    prefer: (files) => files.find((f) => f.name.toLowerCase().includes('setup')) ?? files[0]
   },
   {
     id: 'linux',
@@ -46,8 +55,8 @@ const PLATFORMS: PlatformSpec[] = [
     file: '.AppImage / .deb / .rpm',
     arch: 'x86_64',
     icon: <LinuxIcon />,
-    match: /^markweave-linux-.+\.(AppImage|deb|rpm|snap|tar\.gz)$/i,
-    prefer: /\.AppImage$/i
+    key: 'linux',
+    prefer: (files) => files.find((f) => f.name.toLowerCase().endsWith('.appimage')) ?? files[0]
   },
   {
     id: 'ios',
@@ -55,33 +64,32 @@ const PLATFORMS: PlatformSpec[] = [
     file: '暂无安装包',
     arch: 'Apple 移动设备',
     icon: <SmartphoneIcon />,
+    key: 'ios',
     disabled: true
   }
 ]
 
-const API = '/api/releases/latest'
-
 export default function LatestDownloads() {
-  const [assets, setAssets] = useState<Asset[] | null>(null)
+  const [manifest, setManifest] = useState<DownloadManifest | null>(null)
 
   useEffect(() => {
-    fetch(API)
+    fetch('/downloads/manifest.json')
       .then((res) => (res.ok ? res.json() : null))
-      .then((data: { assets?: Asset[] } | null) => setAssets(data?.assets ?? []))
-      .catch(() => setAssets([]))
+      .then((data: DownloadManifest | null) => setManifest(data))
+      .catch(() => setManifest(null))
   }, [])
 
   return (
     <>
       <div className="quick-dl">
         {PLATFORMS.map((platform) => (
-          <DownloadCard key={platform.id} platform={platform} assets={assets} />
+          <DownloadCard key={platform.id} platform={platform} manifest={manifest} />
         ))}
       </div>
       <p className="quick-dl-hint">
-        {assets === null
-          ? '正在读取 GitHub 最新发布信息…'
-          : '安装包来自 GitHub Releases；iOS / iPadOS 是桌面应用暂未支持的平台。'}
+        {manifest === null
+          ? '正在读取安装包列表…'
+          : '安装包托管在 markweave.cloud，国内可直接下载；iOS / iPadOS 是桌面应用暂未支持的平台。'}
       </p>
     </>
   )
@@ -89,11 +97,17 @@ export default function LatestDownloads() {
 
 function DownloadCard({
   platform,
-  assets
+  manifest
 }: {
   platform: PlatformSpec
-  assets: Asset[] | null
+  manifest: DownloadManifest | null
 }) {
+  const files =
+    platform.key === 'ios'
+      ? []
+      : (manifest?.platforms?.[platform.key] ?? [])
+  const file = platform.prefer?.(files) ?? files[0]
+
   if (platform.disabled) {
     return (
       <div className="quick-dl-card is-disabled">
@@ -109,25 +123,34 @@ function DownloadCard({
     )
   }
 
-  const asset = assets?.find(
-    (item) =>
-      platform.match?.test(item.name) &&
-      (!platform.prefer || platform.prefer.test(item.name))
-  )
+  if (!file) {
+    return (
+      <div className="quick-dl-card is-disabled">
+        {platform.icon}
+        <div>
+          <b>{platform.label}</b>
+          <span>
+            {platform.file} · {platform.arch}
+          </span>
+        </div>
+        <em>暂无安装包</em>
+      </div>
+    )
+  }
 
   return (
     <a
       className="quick-dl-card"
-      href={asset?.browser_download_url ?? DOWNLOAD.latest}
-      title={asset?.name ?? '前往 GitHub Releases 查看安装包'}
+      href={file.url}
+      title={file.name}
       {...EXT_LINK}
     >
       {platform.icon}
       <div>
         <b>{platform.label}</b>
-        <span>{asset ? asset.name : `${platform.file} · ${platform.arch}`}</span>
+        <span>{file.name}</span>
       </div>
-      <em>{asset ? '下载' : '发布页'}</em>
+      <em>下载</em>
     </a>
   )
 }

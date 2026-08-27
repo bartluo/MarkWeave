@@ -1,0 +1,20 @@
+{
+  "version": "1.0.0",
+  "updatedAt": "2026-08-21T00:00:00+08:00",
+  "platforms": {
+    "windows": [
+      {
+        "name": "markweave-win-x64-1.0.0-setup.exe",
+        "url": "/downloads/markweave-win-x64-1.0.0-setup.exe",
+        "size": 125472980
+      },
+      {
+        "name": "markweave-win-x64-1.0.0.zip",
+        "url": "/downloads/markweave-win-x64-1.0.0.zip",
+        "size": 172950813
+      }
+    ],
+    "macos": [],
+    "linux": []
+  }
+}

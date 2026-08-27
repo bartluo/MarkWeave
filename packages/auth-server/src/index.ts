@@ -4,6 +4,7 @@ import { serve } from '@hono/node-server'
 import Database from 'better-sqlite3'
 import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
+import nodemailer from 'nodemailer'
 import { z } from 'zod'
 
 /* eslint-disable camelcase -- OAuth wire protocol uses snake_case fields */
@@ -25,6 +26,13 @@ const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID ?? ''
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET ?? ''
 const GITHUB_CLIENT_ID = process.env.GITHUB_CLIENT_ID ?? ''
 const GITHUB_CLIENT_SECRET = process.env.GITHUB_CLIENT_SECRET ?? ''
+const SMTP_HOST = process.env.SMTP_HOST ?? ''
+const SMTP_PORT = Number(process.env.SMTP_PORT ?? 587)
+const SMTP_USER = process.env.SMTP_USER ?? ''
+const SMTP_PASS = process.env.SMTP_PASS ?? ''
+const SMTP_FROM = process.env.SMTP_FROM ?? 'MarkWeave <no-reply@markweave.app>'
+const EMAIL_VERIFY_TTL_SECONDS = 10 * 60
+const EMAIL_VERIFY_MAX_ATTEMPTS = 5
 
 // Exchange an authorization code for the user's verified email. The callback
 // must never trust the code or email sent by the client — only the provider's
@@ -232,12 +240,75 @@ function getDb() {
       reward_cents INTEGER,
       created_at INTEGER NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS email_verifications (
+      id TEXT PRIMARY KEY,
+      email TEXT NOT NULL,
+      code_hash TEXT NOT NULL,
+      purpose TEXT NOT NULL DEFAULT 'register',
+      attempts INTEGER NOT NULL DEFAULT 0,
+      expires_at INTEGER NOT NULL,
+      verified_at INTEGER,
+      consumed_at INTEGER,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_email_verifications_email ON email_verifications(email, purpose);
+    CREATE TABLE IF NOT EXISTS desktop_auth_sessions (
+      id TEXT PRIMARY KEY,
+      state TEXT NOT NULL UNIQUE,
+      code_hash TEXT,
+      user_id TEXT,
+      status TEXT NOT NULL DEFAULT 'pending',
+      expires_at INTEGER NOT NULL,
+      created_at INTEGER NOT NULL,
+      completed_at INTEGER,
+      consumed_at INTEGER
+    );
+    CREATE INDEX IF NOT EXISTS idx_desktop_auth_state ON desktop_auth_sessions(state);
   `)
   return db
 }
 
 function generateId(): string {
   return crypto.randomUUID()
+}
+
+function generateVerificationCode(): string {
+  return crypto.randomInt(0, 1_000_000).toString().padStart(6, '0')
+}
+
+function hashVerificationCode(code: string): string {
+  return crypto.createHash('sha256').update(code).digest('hex')
+}
+
+async function sendVerificationEmail(
+  email: string,
+  code: string
+): Promise<{ delivered: boolean; devMode: boolean }> {
+  const subject = 'MarkWeave 注册验证码'
+  const text = [
+    `你的 MarkWeave 注册验证码是：${code}`,
+    '验证码 10 分钟内有效。如果不是本人操作，请忽略本邮件。'
+  ].join('\n\n')
+
+  if (!SMTP_HOST) {
+    console.log(`[email-verification] dev fallback for ${email}: code=${code}`)
+    return { delivered: false, devMode: true }
+  }
+
+  const transporter = nodemailer.createTransport({
+    host: SMTP_HOST,
+    port: SMTP_PORT,
+    secure: SMTP_PORT === 465,
+    auth: SMTP_USER ? { user: SMTP_USER, pass: SMTP_PASS } : undefined
+  })
+  await transporter.sendMail({
+    from: SMTP_FROM,
+    to: email,
+    subject,
+    text
+  })
+  return { delivered: true, devMode: false }
 }
 
 function hashPassword(password: string): Promise<string> {
@@ -282,28 +353,281 @@ const authMiddleware = async (c: any, next: () => Promise<void>) => {
 
 // ── Routes ────────────────────────────────────────────────────────────────────
 
+// POST /v1/auth/verification/send
+app.post('/v1/auth/verification/send', async (c) => {
+  const body = await c.req.json()
+  const parsed = z.object({ email: z.string().email() }).safeParse(body)
+  if (!parsed.success) return c.json({ error: 'INVALID_INPUT' }, 400)
+
+  const email = parsed.data.email.trim().toLowerCase()
+  const db = getDb()
+  const existing = db.prepare('SELECT id FROM users WHERE email = ?').get(email) as any
+  if (existing) {
+    db.close()
+    return c.json({ error: 'EMAIL_EXISTS' }, 409)
+  }
+
+  const nowMs = Date.now()
+  const last = db
+    .prepare(
+      `SELECT id, created_at FROM email_verifications
+       WHERE email = ? AND purpose = 'register'
+       ORDER BY created_at DESC LIMIT 1`
+    )
+    .get(email) as { id: string; created_at: number } | undefined
+  if (last && nowMs - last.created_at * 1000 < 60_000) {
+    db.close()
+    return c.json({ error: 'VERIFICATION_TOO_FREQUENT' }, 429)
+  }
+
+  const code = SMTP_HOST
+    ? generateVerificationCode()
+    : (process.env.EMAIL_VERIFY_DEV_CODE || generateVerificationCode())
+  const now = Math.floor(nowMs / 1000)
+  db.prepare(
+    `DELETE FROM email_verifications
+     WHERE email = ? AND purpose = 'register' AND expires_at <= ?`
+  ).run(email, now)
+  db.prepare(
+    `INSERT INTO email_verifications
+     (id, email, code_hash, purpose, attempts, expires_at, created_at, updated_at)
+     VALUES (?, ?, ?, 'register', 0, ?, ?, ?)`
+  ).run(generateId(), email, hashVerificationCode(code), now + EMAIL_VERIFY_TTL_SECONDS, now, now)
+
+  try {
+    const result = await sendVerificationEmail(email, code)
+    db.close()
+    if (!result.delivered && !result.devMode) {
+      return c.json({ error: 'MAIL_SEND_FAILED' }, 502)
+    }
+    return c.json({
+      ok: true,
+      sent: result.delivered,
+      devFallback: result.devMode
+    })
+  } catch (err) {
+    db.close()
+    console.error('[email-verification] send failed:', err)
+    return c.json({ error: 'MAIL_SEND_FAILED' }, 502)
+  }
+})
+
+// POST /v1/auth/verification/verify
+app.post('/v1/auth/verification/verify', async (c) => {
+  const body = await c.req.json()
+  const parsed = z
+    .object({ email: z.string().email(), code: z.string().length(6) })
+    .safeParse(body)
+  if (!parsed.success) return c.json({ error: 'INVALID_INPUT' }, 400)
+
+  const email = parsed.data.email.trim().toLowerCase()
+  const now = Math.floor(Date.now() / 1000)
+  const db = getDb()
+  const verification = db
+    .prepare(
+      `SELECT * FROM email_verifications
+       WHERE email = ? AND purpose = 'register'
+       ORDER BY created_at DESC LIMIT 1`
+    )
+    .get(email) as any
+  if (!verification || verification.expires_at <= now) {
+    db.close()
+    return c.json({ error: 'CODE_EXPIRED' }, 400)
+  }
+  if (verification.verified_at) {
+    db.close()
+    return c.json({ ok: true })
+  }
+  if (verification.attempts >= EMAIL_VERIFY_MAX_ATTEMPTS) {
+    db.close()
+    return c.json({ error: 'TOO_MANY_ATTEMPTS' }, 429)
+  }
+  if (hashVerificationCode(parsed.data.code) !== verification.code_hash) {
+    db.prepare(
+      'UPDATE email_verifications SET attempts = attempts + 1, updated_at = ? WHERE id = ?'
+    ).run(now, verification.id)
+    db.close()
+    return c.json({ error: 'INVALID_CODE' }, 400)
+  }
+
+  db.prepare(
+    'UPDATE email_verifications SET verified_at = ?, updated_at = ? WHERE id = ?'
+  ).run(now, now, verification.id)
+  db.close()
+  return c.json({ ok: true })
+})
+
+// POST /v1/auth/desktop/begin — client opens the embedded web login window.
+app.post('/v1/auth/desktop/begin', async (c) => {
+  const body = await c.req.json()
+  const parsed = z
+    .object({ state: z.string().min(16).max(128) })
+    .safeParse(body)
+  if (!parsed.success) return c.json({ error: 'INVALID_INPUT' }, 400)
+
+  const now = Math.floor(Date.now() / 1000)
+  const db = getDb()
+  const existing = db
+    .prepare('SELECT id FROM desktop_auth_sessions WHERE state = ?')
+    .get(parsed.data.state) as any
+  if (existing) {
+    db.close()
+    return c.json({ error: 'STATE_ALREADY_USED' }, 409)
+  }
+
+  db.prepare(
+    `INSERT INTO desktop_auth_sessions
+     (id, state, status, expires_at, created_at)
+     VALUES (?, ?, 'pending', ?, ?)`
+  ).run(generateId(), parsed.data.state, now + 10 * 60, now)
+  db.close()
+  return c.json({ ok: true, expiresIn: 10 * 60 })
+})
+
+// POST /v1/auth/desktop/complete — website issues a one-time code after login.
+app.post('/v1/auth/desktop/complete', authMiddleware, async (c) => {
+  const body = await c.req.json()
+  const parsed = z
+    .object({ state: z.string().min(16).max(128) })
+    .safeParse(body)
+  if (!parsed.success) return c.json({ error: 'INVALID_INPUT' }, 400)
+
+  const { userId } = c.get('auth')!
+  const now = Math.floor(Date.now() / 1000)
+  const db = getDb()
+  const session = db
+    .prepare('SELECT * FROM desktop_auth_sessions WHERE state = ?')
+    .get(parsed.data.state) as any
+  if (!session || session.status !== 'pending' || session.expires_at <= now) {
+    db.close()
+    return c.json({ error: 'SESSION_EXPIRED' }, 400)
+  }
+
+  const user = db.prepare('SELECT * FROM users WHERE id = ?').get(userId) as any
+  if (!user) {
+    db.close()
+    return c.json({ error: 'USER_NOT_FOUND' }, 404)
+  }
+  const code = crypto.randomBytes(24).toString('hex')
+  db.prepare(
+    `UPDATE desktop_auth_sessions
+     SET user_id = ?, code_hash = ?, status = 'ready', completed_at = ?
+     WHERE id = ?`
+  ).run(user.id, hashVerificationCode(code), now, session.id)
+  db.close()
+  return c.json({ ok: true, code })
+})
+
+// POST /v1/auth/desktop/exchange — client swaps the one-time code for tokens.
+app.post('/v1/auth/desktop/exchange', async (c) => {
+  const body = await c.req.json()
+  const parsed = z
+    .object({
+      state: z.string().min(16).max(128),
+      code: z.string().min(32).max(128)
+    })
+    .safeParse(body)
+  if (!parsed.success) return c.json({ error: 'INVALID_INPUT' }, 400)
+
+  const now = Math.floor(Date.now() / 1000)
+  const db = getDb()
+  const session = db
+    .prepare('SELECT * FROM desktop_auth_sessions WHERE state = ?')
+    .get(parsed.data.state) as any
+  if (
+    !session ||
+    session.status !== 'ready' ||
+    session.consumed_at ||
+    session.expires_at <= now ||
+    !session.user_id ||
+    !session.code_hash ||
+    hashVerificationCode(parsed.data.code) !== session.code_hash
+  ) {
+    db.close()
+    return c.json({ error: 'INVALID_SESSION' }, 400)
+  }
+
+  const user = db.prepare('SELECT * FROM users WHERE id = ?').get(session.user_id) as any
+  if (!user) {
+    db.close()
+    return c.json({ error: 'USER_NOT_FOUND' }, 404)
+  }
+  const accessToken = signAccessToken(user.id, user.email)
+  const refreshToken = signRefreshToken(user.id)
+  db.prepare('UPDATE desktop_auth_sessions SET consumed_at = ? WHERE id = ?').run(now, session.id)
+  db.close()
+
+  return c.json({
+    ok: true,
+    token: accessToken,
+    refreshToken,
+    expiresIn: 7 * 24 * 60 * 60,
+    user: {
+      id: user.id,
+      email: user.email,
+      displayName: user.display_name,
+      createdAt: user.created_at
+    }
+  })
+})
+
 // POST /v1/auth/register
 app.post('/v1/auth/register', async (c) => {
   const body = await c.req.json()
   const parsed = z.object({
     email: z.string().email(),
     password: z.string().min(8),
-    displayName: z.string().min(1).max(64)
+    displayName: z.string().min(1).max(64),
+    verificationCode: z.string().length(6)
   }).safeParse(body)
   if (!parsed.success) return c.json({ error: 'INVALID_INPUT' }, 400)
 
+  const email = parsed.data.email.trim().toLowerCase()
   const db = getDb()
-  const existing = db.prepare('SELECT id FROM users WHERE email = ?').get(parsed.data.email) as any
+  const now = Math.floor(Date.now() / 1000)
+  const verification = db
+    .prepare(
+      `SELECT * FROM email_verifications
+       WHERE email = ? AND purpose = 'register'
+       ORDER BY created_at DESC LIMIT 1`
+    )
+    .get(email) as any
+  if (!verification || verification.expires_at <= now) {
+    db.close()
+    return c.json({ error: 'VERIFICATION_REQUIRED' }, 400)
+  }
+  if (verification.consumed_at) {
+    db.close()
+    return c.json({ error: 'VERIFICATION_USED' }, 400)
+  }
+  if (verification.attempts >= EMAIL_VERIFY_MAX_ATTEMPTS) {
+    db.close()
+    return c.json({ error: 'TOO_MANY_ATTEMPTS' }, 429)
+  }
+  if (hashVerificationCode(parsed.data.verificationCode) !== verification.code_hash) {
+    db.prepare(
+      'UPDATE email_verifications SET attempts = attempts + 1, updated_at = ? WHERE id = ?'
+    ).run(now, verification.id)
+    db.close()
+    return c.json({ error: 'INVALID_CODE' }, 400)
+  }
+
+  const existing = db.prepare('SELECT id FROM users WHERE email = ?').get(email) as any
   if (existing) return c.json({ error: 'EMAIL_EXISTS' }, 409)
 
   const id = generateId()
-  const now = Math.floor(Date.now() / 1000)
   const passwordHash = await hashPassword(parsed.data.password)
-  db.prepare(
-    'INSERT INTO users (id, email, password_hash, display_name, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)'
-  ).run(id, parsed.data.email, passwordHash, parsed.data.displayName, now, now)
+  const createUserAndConsumeCode = db.transaction(() => {
+    db.prepare(
+      'INSERT INTO users (id, email, password_hash, display_name, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)'
+    ).run(id, email, passwordHash, parsed.data.displayName, now, now)
+    db.prepare(
+      'UPDATE email_verifications SET consumed_at = ?, updated_at = ? WHERE id = ?'
+    ).run(now, now, verification.id)
+  })
+  createUserAndConsumeCode()
 
-  const accessToken = signAccessToken(id, parsed.data.email)
+  const accessToken = signAccessToken(id, email)
   const refreshToken = signRefreshToken(id)
   db.prepare(
     'INSERT INTO sessions (id, user_id, access_token, refresh_token, expires_at, created_at) VALUES (?, ?, ?, ?, ?, ?)'
@@ -315,7 +639,7 @@ app.post('/v1/auth/register', async (c) => {
     token: accessToken,
     refreshToken,
     expiresIn: 7 * 24 * 60 * 60,
-    user: { id, email: parsed.data.email, displayName: parsed.data.displayName, createdAt: now }
+    user: { id, email, displayName: parsed.data.displayName, createdAt: now }
   })
 })
 
@@ -325,8 +649,9 @@ app.post('/v1/auth/login', async (c) => {
   const parsed = z.object({ email: z.string().email(), password: z.string() }).safeParse(body)
   if (!parsed.success) return c.json({ error: 'INVALID_INPUT' }, 400)
 
+  const email = parsed.data.email.trim().toLowerCase()
   const db = getDb()
-  const user = db.prepare('SELECT * FROM users WHERE email = ?').get(parsed.data.email) as any
+  const user = db.prepare('SELECT * FROM users WHERE email = ?').get(email) as any
   if (!user) return c.json({ error: 'USER_NOT_FOUND' }, 404)
   if (!user.password_hash) return c.json({ error: 'OAUTH_ONLY' }, 400)
 

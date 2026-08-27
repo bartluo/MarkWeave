@@ -5,7 +5,8 @@ import {
   Brush as ThemeIcon,
   Picture as ImageIcon,
   Reading as SpellIcon,
-  Operation as KeyBindingIcon
+  Operation as KeyBindingIcon,
+  GoldMedal as ProIcon
 } from '@element-plus/icons-vue'
 
 import preferences from '../../../../main/preferences/schema.json'
@@ -66,6 +67,12 @@ interface CachedTranslator {
 const preferencesSchema = preferences as unknown as Record<string, PreferenceSchemaEntry>
 
 export const getCategory = (): PrefCategory[] => [
+  {
+    name: t('preferences.categories.pro'),
+    label: 'pro',
+    icon: ProIcon,
+    path: '/preference/pro'
+  },
   {
     name: t('preferences.categories.general'),
     label: 'general',
@@ -159,6 +166,7 @@ export const getTranslatedSearchContent: CachedTranslator = (() => {
       let routeCategory = mappedCategory
       const validRoutes = [
         'general',
+        'pro',
         'editor',
         'markdown',
         'spelling',

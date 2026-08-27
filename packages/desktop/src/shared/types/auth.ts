@@ -45,6 +45,12 @@ export interface AuthResult {
   refreshToken?: string
   expiresIn?: number
   error?: string
+  user?: {
+    id: string
+    email: string
+    displayName: string
+    createdAt: number
+  }
 }
 
 /** Minimal user profile returned after login */
@@ -206,4 +212,14 @@ export interface CouponInfo {
   type: string
   value: number
   name: string
+}
+
+/** 客户端本地免费试用状态（7 天试用 + 3 天离线宽限） */
+export interface TrialState {
+  status: 'trial' | 'grace' | 'locked'
+  trialStartedAt: number
+  trialEndsAt: number
+  graceEndsAt: number
+  remainingMs: number
+  graceRemainingMs: number
 }

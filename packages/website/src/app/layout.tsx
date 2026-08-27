@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next'
 import { DEFAULT_THEME, THEME_STORAGE_KEY } from '@/lib/sections'
+import CustomerServiceButton from '@/components/CustomerServiceButton'
 import './globals.css'
 
 const SITE_URL = 'https://markweave.app'
@@ -82,6 +83,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body>
         {children}
+        <CustomerServiceButton />
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}

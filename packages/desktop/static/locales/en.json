@@ -430,6 +430,7 @@
       }
     },
     "categories": {
+      "pro": "Pro",
       "general": "General",
       "editor": "Editor",
       "markdown": "Markdown",
@@ -437,6 +438,81 @@
       "theme": "Theme",
       "image": "Image",
       "keybindings": "Keybindings"
+    },
+    "account": {
+      "title": "Account",
+      "email": "Email",
+      "password": "Password",
+      "displayName": "Display name",
+      "oauthDivider": "or sign in with",
+      "logout": "Sign out",
+      "logoutSuccess": "Signed out",
+      "signIn": {
+        "title": "Sign in",
+        "hint": "Sign in to sync devices, manage licenses, and manage subscriptions.",
+        "submit": "Sign in",
+        "switch": "No account? Register now",
+        "success": "Signed in",
+        "failed": "Sign in failed, please try again"
+      },
+      "register": {
+        "submit": "Register",
+        "switch": "Already have an account? Sign in"
+      },
+      "linkLicense": {
+        "title": "Link local license",
+        "hint": "Enter a license key to link your local Pro license to this account.",
+        "placeholder": "Enter license key",
+        "submit": "Link",
+        "success": "License linked",
+        "failed": "Failed to link license"
+      },
+      "profile": {
+        "title": "Profile"
+      },
+      "subscription": {
+        "title": "Subscription",
+        "plan": "Plan",
+        "status": "Status",
+        "expiresAt": "Expires at",
+        "billingCycle": "Billing cycle",
+        "upgrade": "Upgrade subscription"
+      },
+      "devices": {
+        "title": "Devices",
+        "active": "Active",
+        "inactive": "Inactive",
+        "deactivate": "Deactivate",
+        "empty": "No devices",
+        "refresh": "Refresh devices"
+      },
+      "coupon": {
+        "title": "Coupon",
+        "placeholder": "Enter coupon code",
+        "validate": "Validate",
+        "invalid": "Invalid coupon"
+      },
+      "referral": {
+        "title": "Referral",
+        "code": "Referral code",
+        "converted": "Converted",
+        "generating": "Generating referral code…"
+      },
+      "team": {
+        "title": "Team",
+        "hint": "Create a team to collaborate with members.",
+        "create": "Create team",
+        "createTitle": "Create team",
+        "name": "Team name",
+        "namePlaceholder": "Enter team name",
+        "created": "Team created",
+        "createFailed": "Failed to create team"
+      },
+      "notifications": {
+        "title": "Notifications",
+        "empty": "No notifications",
+        "refresh": "Refresh notifications"
+      }
     },
     "general": {
       "title": "General",
@@ -871,8 +947,43 @@
     }
   },
   "about": {
-    "copyright": "Copyright © Luo Ran 2017-{year}",
-    "copyrightContributors": "Made with <3 by Github Contributors"
+    "copyright": "Copyright © {year} Kunming Fanlai Technology Co., Ltd.",
+    "copyrightContributors": "Owner: Kunming Fanlai Technology Co., Ltd."
+  },
+  "proPage": {
+    "title": "Pro Version",
+    "subtitle": "Unlock the full writing toolkit with a one-time purchase.",
+    "activeHint": "You are activated — Pro features are available.",
+    "freeHint": "You are on the free plan. Upgrade to unlock export, all themes and cloud sync.",
+    "upgradeNow": "Upgrade Now",
+    "popular": "Most Popular",
+    "upgradePro": "Upgrade to Pro",
+    "learnMore": "Learn More",
+    "planFree": "Free",
+    "planCommercial": "Commercial",
+    "free": {
+      "all": "Everything in Free",
+      "livePreview": "Live Markdown preview",
+      "gfm": "GitHub Flavored Markdown (GFM)",
+      "math": "KaTeX math formulas",
+      "mermaid": "Mermaid diagrams",
+      "localSave": "Local save & Markdown export"
+    },
+    "pro": {
+      "all": "Everything in Pro",
+      "pdf": "PDF export (high-quality typesetting)",
+      "html": "HTML export",
+      "themes": "All premium themes (33+)",
+      "plantuml": "PlantUML diagrams",
+      "highlight": "Advanced code highlighting"
+    },
+    "commercial": {
+      "sync": "Real-time cloud sync",
+      "library": "Cloud document library (up to 500)",
+      "history": "30-day version history",
+      "e2ee": "End-to-end encrypted sync",
+      "support": "Priority support"
+    }
   },
   "commands": {
     "mt": {

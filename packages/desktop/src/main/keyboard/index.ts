@@ -21,9 +21,20 @@ type KeyboardInfoListener = (info: KeyboardInfo) => void
 
 let currentKeyboardInfo: KeyboardInfo | null = null
 const loadKeyboardInfo = (): KeyboardInfo => {
-  currentKeyboardInfo = {
-    layout: getCurrentKeyboardLayout(),
-    keymap: getKeyMap()
+  try {
+    currentKeyboardInfo = {
+      layout: getCurrentKeyboardLayout(),
+      keymap: getKeyMap()
+    }
+  } catch (err) {
+    // native-keymap is optional in some dev environments (no native build).
+    // Fall back to a US layout so the app can still start; keyboard layout
+    // detection simply stays at the default.
+    log.warn('native-keymap unavailable, using fallback keyboard layout:', err)
+    currentKeyboardInfo = {
+      layout: { id: 'fallback', layout: 'US' } as unknown as IKeyboardLayoutInfo,
+      keymap: {}
+    }
   }
   return currentKeyboardInfo
 }
@@ -67,16 +78,20 @@ class KeyboardLayoutMonitor extends EventEmitter {
   _ensureNativeListener(): void {
     if (!this._isSubscribed) {
       this._isSubscribed = true
-      onDidChangeKeyboardLayout(() => {
-        // The keyboard layout change event may be emitted multiple times.
-        if (this._emitTimer) {
-          clearTimeout(this._emitTimer)
-        }
-        this._emitTimer = setTimeout(() => {
-          this.emit(KEYBOARD_LAYOUT_MONITOR_CHANNEL_ID, loadKeyboardInfo())
-          this._emitTimer = null
-        }, 150)
-      })
+      try {
+        onDidChangeKeyboardLayout(() => {
+          // The keyboard layout change event may be emitted multiple times.
+          if (this._emitTimer) {
+            clearTimeout(this._emitTimer)
+          }
+          this._emitTimer = setTimeout(() => {
+            this.emit(KEYBOARD_LAYOUT_MONITOR_CHANNEL_ID, loadKeyboardInfo())
+            this._emitTimer = null
+          }, 150)
+        })
+      } catch (err) {
+        log.warn('keyboard layout monitoring unavailable:', err)
+      }
     }
   }
 }

@@ -161,3 +161,15 @@ export const SmartphoneIcon = (props: IconProps) => (
     <path d="M12 18h.01" />
   </svg>
 )
+
+export const WechatIcon = (props: IconProps) => (
+  <svg viewBox="0 0 24 24" fill="currentColor" {...props}>
+    <path d="M8.7 4C4.9 4 2 6.5 2 9.6c0 1.8 1 3.3 2.6 4.4l-.7 2.2 2.4-1.2c.6.2 1.2.3 1.9.3l.5 0c-.2-.6-.3-1.2-.3-1.8 0-2.8 2.6-5 5.8-5l.5 0c-.5-2.5-3.3-4.5-6.7-4.5zM6.5 7.3a.9.9 0 1 1 0 1.8.9.9 0 0 1 0-1.8zm4.2 0a.9.9 0 1 1 0 1.8.9.9 0 0 1 0-1.8zM22 14.8c0-2.6-2.6-4.7-5.7-4.7s-5.7 2.1-5.7 4.7 2.6 4.7 5.7 4.7c.6 0 1.2-.1 1.8-.3l2.3 1.2-.7-2.1c1.4-1 2.3-2.3 2.3-3.5zm-8.1-1a.8.8 0 1 1 0-1.6.8.8 0 0 1 0 1.6zm4.7 0a.8.8 0 1 1 0-1.6.8.8 0 0 1 0 1.6z" />
+  </svg>
+)
+
+export const PhoneIcon = (props: IconProps) => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+    <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.79 19.79 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z" />
+  </svg>
+)

@@ -104,8 +104,11 @@ class EditorWindow extends BaseWindow {
       editorWinOptions,
       options
     )
-    if (isLinux) {
-      winOptions.icon = path.join(process.cwd(), 'static', 'logo-96px.png')
+    if (!isOsx) {
+      winOptions.icon = path.join(
+        (global as unknown as { __static: string }).__static,
+        'icon.png'
+      )
     }
 
     const {

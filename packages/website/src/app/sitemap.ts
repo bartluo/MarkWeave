@@ -1,5 +1,4 @@
 import type { MetadataRoute } from 'next'
-import { ALL_PAGES } from '@/lib/docs-nav'
 
 const SITE = 'https://markweave.app'
 
@@ -25,16 +24,16 @@ export default function sitemap(): MetadataRoute.Sitemap {
       priority: 0.9
     },
     {
-      url: SITE + '/docs',
+      url: SITE + '/privacy',
       lastModified: now,
-      changeFrequency: 'weekly',
-      priority: 0.9
+      changeFrequency: 'yearly',
+      priority: 0.4
     },
-    ...ALL_PAGES.map((page) => ({
-      url: SITE + page.href,
+    {
+      url: SITE + '/contact',
       lastModified: now,
-      changeFrequency: 'weekly' as const,
-      priority: 0.7
-    }))
+      changeFrequency: 'monthly',
+      priority: 0.6
+    },
   ]
 }

@@ -1,7 +1,7 @@
 import crypto from 'node:crypto'
 import http from 'node:http'
 import type { AddressInfo } from 'node:net'
-import { BrowserWindow } from 'electron'
+import { BrowserWindow, shell } from 'electron'
 import log from 'electron-log'
 import { getLicenseManager, type LicenseFeature } from '../license'
 import type {
@@ -23,15 +23,19 @@ import type {
   CouponInfo
 } from '@shared/types/auth'
 import { TokenStore } from './tokenStore'
+import { LocalAccountStore } from './localAccount'
 
 const AUTH_SERVER_URL =
   process.env.MARKWEAVE_AUTH_SERVER ?? 'https://auth.markweave.app'
+const WEBSITE_URL = process.env.MARKWEAVE_WEBSITE_URL ?? 'https://markweave.app'
 
 class AuthManager {
   private tokenStore: TokenStore
+  private localAccount: LocalAccountStore
   private serverUrl: string
   private state: AuthStatus
   private refreshTimer?: NodeJS.Timeout
+  private desktopAuthWindow: BrowserWindow | null = null
   // Pending OAuth challenge, kept to validate the CSRF `state` when the
   // authorization code comes back, plus the loopback redirect we told the
   // provider about.
@@ -43,6 +47,7 @@ class AuthManager {
 
   constructor() {
     this.tokenStore = new TokenStore()
+    this.localAccount = new LocalAccountStore()
     this.serverUrl = AUTH_SERVER_URL
     this.state = {
       authenticated: false,
@@ -200,6 +205,90 @@ class AuthManager {
     }
     this.emitStateChange()
     return { ok: true }
+  }
+
+  async startDesktopAuth(owner?: BrowserWindow | null): Promise<{ ok: boolean; error?: string }> {
+    if (this.desktopAuthWindow && !this.desktopAuthWindow.isDestroyed()) {
+      this.desktopAuthWindow.focus()
+      return { ok: true }
+    }
+
+    const state = crypto.randomUUID().replace(/-/g, '') + crypto.randomBytes(8).toString('hex')
+    const res = await this.postJson<{ ok: boolean }>('/v1/auth/desktop/begin', { state })
+    if (!res?.ok) return { ok: false, error: 'AUTH_SERVICE_UNAVAILABLE' }
+
+    const win = new BrowserWindow({
+      width: 980,
+      height: 720,
+      parent: owner ?? undefined,
+      modal: !!owner,
+      autoHideMenuBar: true,
+      title: 'MarkWeave 注册 / 登录',
+      webPreferences: {
+        contextIsolation: true,
+        nodeIntegration: false,
+        sandbox: true
+      }
+    })
+    this.desktopAuthWindow = win
+    ;(win.webContents as unknown as { __markweaveDesktopAuthOrigin?: string })
+      .__markweaveDesktopAuthOrigin = WEBSITE_URL
+
+    win.webContents.setWindowOpenHandler(({ url }) => {
+      void shell.openExternal(url)
+      return { action: 'deny' }
+    })
+
+    const handleUrl = (url: string): boolean => {
+      try {
+        const parsed = new URL(url)
+        if (parsed.origin !== new URL(WEBSITE_URL).origin || parsed.pathname !== '/auth/complete') {
+          return false
+        }
+        const code = parsed.searchParams.get('code')
+        const stateParam = parsed.searchParams.get('state')
+        if (!code || stateParam !== state) return false
+        void this.completeDesktopAuth(state, code).finally(() => {
+          if (!win.isDestroyed()) win.close()
+        })
+        return true
+      } catch {
+        return false
+      }
+    }
+
+    win.webContents.on('did-navigate', (_event, url) => {
+      handleUrl(url)
+    })
+    win.on('closed', () => {
+      if (this.desktopAuthWindow === win) this.desktopAuthWindow = null
+    })
+    win.once('ready-to-show', () => win.show())
+    await win.loadURL(`${WEBSITE_URL}/register?desktop_auth=${state}`)
+    return { ok: true }
+  }
+
+  async completeDesktopAuth(state: string, code: string): Promise<AuthResult> {
+    try {
+      const res = await fetch(this.serverUrl + '/v1/auth/desktop/exchange', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ state, code }),
+        signal: AbortSignal.timeout(15_000)
+      })
+      const data = (await res.json()) as AuthResult
+      if (!res.ok || !data.ok || !data.token || !data.refreshToken) {
+        return { ok: false, error: data.error ?? 'DESKTOP_AUTH_FAILED' }
+      }
+      await this.tokenStore.saveTokens(data.token, data.refreshToken, data.expiresIn!)
+      await this.tokenStore.saveProfile(data.user?.email ?? '', 'local')
+      await this.restoreState()
+      this.emitStateChange()
+      return data
+    } catch (err) {
+      log.warn('desktop auth exchange failed:', err)
+      return { ok: false, error: 'DESKTOP_AUTH_FAILED' }
+    }
   }
 
   async refreshToken(): Promise<{ ok: boolean; token?: string }> {
@@ -539,6 +628,23 @@ class AuthManager {
   }
 
   // ---------- 工具方法 ----------
+
+  getLocalStatus(): { registered: boolean; loggedIn: boolean; email?: string; displayName?: string } {
+    return this.localAccount.status()
+  }
+
+  localRegister(req: RegisterRequest): { ok: boolean; error?: string } {
+    return this.localAccount.register(req.email, req.password, req.displayName)
+  }
+
+  localLogin(credentials: LoginCredentials): { ok: boolean; email?: string; displayName?: string; error?: string } {
+    return this.localAccount.login(credentials.email, credentials.password)
+  }
+
+  localLogout(): { ok: boolean } {
+    this.localAccount.logout()
+    return { ok: true }
+  }
 
   isCloudEnabled(): boolean {
     // Cloud mode is enabled when the auth server URL differs from the default placeholder

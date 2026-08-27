@@ -430,6 +430,7 @@
       }
     },
     "categories": {
+      "pro": "Pro",
       "general": "通用",
       "editor": "编辑器",
       "markdown": "Markdown",
@@ -437,6 +438,81 @@
       "theme": "主题",
       "image": "图片",
       "keybindings": "快捷键"
+    },
+    "account": {
+      "title": "账户",
+      "email": "邮箱",
+      "password": "密码",
+      "displayName": "昵称",
+      "oauthDivider": "或使用以下方式登录",
+      "logout": "退出登录",
+      "logoutSuccess": "已退出登录",
+      "signIn": {
+        "title": "登录账户",
+        "hint": "登录后可同步多设备数据、管理许可证和订阅。",
+        "submit": "登录",
+        "switch": "没有账户？立即注册",
+        "success": "登录成功",
+        "failed": "登录失败，请重试"
+      },
+      "register": {
+        "submit": "注册",
+        "switch": "已有账户？直接登录"
+      },
+      "linkLicense": {
+        "title": "关联本地许可证",
+        "hint": "输入许可证密钥，将本地 Pro 授权绑定到当前账户。",
+        "placeholder": "请输入许可证密钥",
+        "submit": "关联",
+        "success": "许可证关联成功",
+        "failed": "许可证关联失败"
+      },
+      "profile": {
+        "title": "个人资料"
+      },
+      "subscription": {
+        "title": "订阅信息",
+        "plan": "套餐",
+        "status": "状态",
+        "expiresAt": "到期时间",
+        "billingCycle": "计费周期",
+        "upgrade": "升级订阅"
+      },
+      "devices": {
+        "title": "设备管理",
+        "active": "在线",
+        "inactive": "离线",
+        "deactivate": "解除绑定",
+        "empty": "暂无设备",
+        "refresh": "刷新设备"
+      },
+      "coupon": {
+        "title": "优惠券",
+        "placeholder": "请输入优惠券代码",
+        "validate": "验证",
+        "invalid": "优惠券无效"
+      },
+      "referral": {
+        "title": "邀请返利",
+        "code": "邀请码",
+        "converted": "是否已转化",
+        "generating": "正在生成邀请码…"
+      },
+      "team": {
+        "title": "团队",
+        "hint": "创建团队并与成员协作。",
+        "create": "创建团队",
+        "createTitle": "创建团队",
+        "name": "团队名称",
+        "namePlaceholder": "输入团队名称",
+        "created": "团队创建成功",
+        "createFailed": "团队创建失败"
+      },
+      "notifications": {
+        "title": "通知",
+        "empty": "暂无通知",
+        "refresh": "刷新通知"
+      }
     },
     "general": {
       "title": "通用",
@@ -871,8 +947,43 @@
     }
   },
   "about": {
-    "copyright": "版权",
-    "copyrightContributors": "版权贡献者"
+    "copyright": "版权所有 © {year} Kunming Fanlai Technology Co., Ltd.",
+    "copyrightContributors": "所有者：Kunming Fanlai Technology Co., Ltd."
+  },
+  "proPage": {
+    "title": "Pro 版本",
+    "subtitle": "解锁完整创作能力，一次购买，永久使用。",
+    "activeHint": "您已激活，Pro 功能可用。",
+    "freeHint": "当前为免费版，升级后解锁导出、全部主题与云同步等功能。",
+    "upgradeNow": "立即升级",
+    "popular": "最受欢迎",
+    "upgradePro": "升级到 Pro",
+    "learnMore": "了解更多",
+    "planFree": "免费版",
+    "planCommercial": "商业版",
+    "free": {
+      "all": "免费版全部功能",
+      "livePreview": "Markdown 实时预览",
+      "gfm": "GitHub 风格 Markdown（GFM）",
+      "math": "KaTeX 数学公式",
+      "mermaid": "Mermaid 流程图",
+      "localSave": "本地保存与 Markdown 导出"
+    },
+    "pro": {
+      "all": "Pro 全部功能",
+      "pdf": "导出 PDF（高质量排版）",
+      "html": "导出 HTML",
+      "themes": "全部 Premium 主题（33+）",
+      "plantuml": "PlantUML 图",
+      "highlight": "高级代码块高亮"
+    },
+    "commercial": {
+      "sync": "多设备实时云同步",
+      "library": "云端文档库（最多 500 篇）",
+      "history": "30 天版本历史",
+      "e2ee": "端到端加密传输",
+      "support": "优先技术支持"
+    }
   },
   "commands": {
     "mt": {

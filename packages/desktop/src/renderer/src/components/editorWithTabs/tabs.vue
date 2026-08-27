@@ -276,7 +276,8 @@ onBeforeUnmount(() => {
   flex-direction: row;
   height: 28px;
   user-select: none;
-  box-shadow: 0px 0px 9px 2px rgba(0, 0, 0, 0.1);
+  background: var(--appBarBg);
+  border-bottom: 1px solid var(--appBarBorder);
   overflow: hidden;
   &:hover > .new-file {
     opacity: 1 !important;
@@ -374,7 +375,7 @@ onBeforeUnmount(() => {
       bottom: 0;
       height: 2px;
       border-radius: 2px 2px 0 0;
-      background: var(--themeColor);
+      background: var(--brandGrad);
     }
     & > .close-icon {
       opacity: 1;
@@ -404,7 +405,7 @@ onBeforeUnmount(() => {
 .editor-tabs > .new-file:hover {
   transition: all 0.15s ease-in-out;
   & > svg {
-    fill: var(--focusColor);
+    fill: var(--brandA);
   }
 }
 

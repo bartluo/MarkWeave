@@ -136,7 +136,19 @@ class App {
         event.preventDefault()
       })
       contents.on('will-navigate', (event) => {
-        event.preventDefault()
+        const allowedOrigin = (contents as unknown as { __markweaveDesktopAuthOrigin?: string })
+          .__markweaveDesktopAuthOrigin
+        if (allowedOrigin) {
+          try {
+            if (new URL(event.url).origin !== new URL(allowedOrigin).origin) {
+              event.preventDefault()
+            }
+          } catch {
+            event.preventDefault()
+          }
+        } else {
+          event.preventDefault()
+        }
       })
       contents.setWindowOpenHandler(() => {
         return { action: 'deny' }

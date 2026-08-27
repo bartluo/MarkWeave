@@ -15,7 +15,7 @@ const NAV_LINKS = [
   { label: '使用说明', href: '/#guide' },
   { label: '下载', href: '/download' },
   { label: '价格', href: '/pricing' },
-  { label: '文档', href: '/docs' }
+  { label: '登录 / 注册', href: '/register' }
 ]
 
 export default function Nav() {

@@ -5,28 +5,38 @@
     <div
       class="pref-content"
       :class="{ frameless: titleBarStyle === 'custom' || isOsx }"
-    >
-      <div
-        v-if="!showCustomTitleBar"
-        class="title-bar"
+      >
+        <div
+          v-if="!showCustomTitleBar"
+          class="title-bar"
+        />
+        <router-view class="pref-setting" />
+        <activation-dialog />
+      </div>
+      <trial-gate
+        v-if="showTrialGate"
+        @success="showTrialGate = false"
       />
-      <router-view class="pref-setting" />
     </div>
-  </div>
 </template>
 
 <script setup lang="ts">
-import { computed, watch, onMounted, nextTick } from 'vue'
+import { ref, computed, watch, onMounted, nextTick } from 'vue'
 import { usePreferencesStore } from '@/store/preferences'
+import { useLicenseStore } from '@/store/license'
 import { storeToRefs } from 'pinia'
 import TitleBar from '@/prefComponents/common/titlebar.vue'
 import SideBar from '@/prefComponents/sideBar/index.vue'
 import { addThemeStyle } from '@/util/theme'
 import { DEFAULT_STYLE } from '@/config'
 import { isOsx } from '@/util'
+import ActivationDialog from '@/components/license/activationDialog.vue'
+import TrialGate from '@/components/trialGate/index.vue'
 
 // Store
 const preferencesStore = usePreferencesStore()
+const licenseStore = useLicenseStore()
+const showTrialGate = ref(true)
 
 // Computed properties
 const { theme, titleBarStyle } = storeToRefs(preferencesStore)
@@ -53,6 +63,12 @@ onMounted(() => {
     addThemeStyle(state.theme ?? DEFAULT_STYLE.theme)
 
     preferencesStore.ASK_FOR_USER_PREFERENCE()
+    void licenseStore.init()
+    void window.auth?.getStatus?.().then((status) => {
+      showTrialGate.value = !(status?.authenticated)
+    }).catch(() => {
+      showTrialGate.value = true
+    })
   })
 })
 </script>
@@ -69,6 +85,7 @@ onMounted(() => {
   top: 0;
   left: 0;
   display: flex;
+  flex-direction: column;
   background: var(--editorBgColor);
 
   & h1,
@@ -108,7 +125,8 @@ onMounted(() => {
     flex: 1;
     display: flex;
     flex-direction: column;
-    max-width: calc(100vw - var(--prefSideBarWidth));
+    width: 100%;
+    max-width: 100vw;
     & .title-bar {
       width: 100%;
       height: var(--titleBarHeight);

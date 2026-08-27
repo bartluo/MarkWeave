@@ -161,24 +161,30 @@ onUnmounted(() => {
 .pref-sidebar {
   -webkit-app-region: drag;
   display: flex;
-  flex-direction: column;
-  background: var(--sideBarBgColor);
-  width: var(--prefSideBarWidth);
-  height: 100vh;
-  padding-top: 24px;
+  flex-direction: row;
+  align-items: center;
+  gap: 16px;
+  background: var(--appBarBg);
+  border-bottom: 1px solid var(--appBarBorder);
+  width: 100%;
+  height: auto;
+  min-height: 58px;
+  padding: calc(var(--titleBarHeight) + 8px) 16px 10px;
   box-sizing: border-box;
   & h3 {
     margin: 0;
-    font-size: 20px;
-    font-weight: normal;
-    text-align: center;
+    font-size: 18px;
+    font-weight: 600;
+    white-space: nowrap;
     color: var(--sideBarColor);
+    padding-left: 4px;
   }
 }
 .search-wrapper {
   -webkit-app-region: no-drag;
-  padding: 0 16px;
-  margin: 18px 0;
+  width: 240px;
+  flex-shrink: 0;
+  margin: 0;
 }
 .el-autocomplete {
   width: 100%;
@@ -227,13 +233,20 @@ onUnmounted(() => {
 }
 .category {
   -webkit-app-region: no-drag;
-  overflow-y: auto;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 4px;
+  flex: 1;
+  overflow-x: auto;
+  overflow-y: hidden;
   & .item {
-    width: 100%;
-    height: 38px;
-    font-size: 16px;
+    width: auto;
+    height: 36px;
+    padding: 0 14px;
+    font-size: 14px;
     color: var(--sideBarColor);
-    padding-left: 16px;
+    border-radius: 8px;
     box-sizing: border-box;
     display: flex;
     flex-direction: row;
@@ -241,36 +254,38 @@ onUnmounted(() => {
     cursor: pointer;
     position: relative;
     user-select: none;
+    white-space: nowrap;
+    transition: background 0.18s ease-in-out, color 0.18s ease-in-out;
     & > svg {
       width: 18px;
       height: 18px;
       color: var(--sideBarColor);
-      margin-right: 12px;
+      margin-right: 8px;
     }
     &.active > svg {
-      color: var(--sideBarTitleColor);
+      color: var(--brandA);
     }
     &:hover {
-      background: var(--sideBarItemHoverBgColor);
+      background: var(--appPanelHover);
     }
     &::before {
       content: '';
-      width: 4px;
-      height: 0;
-      background: var(--highlightThemeColor);
+      width: 0;
+      height: 3px;
+      background: var(--brandGrad);
       position: absolute;
-      left: 0;
-      border-top-right-radius: 3px;
-      border-bottom-right-radius: 3px;
-      transition: height 0.25s ease-in-out;
-      top: 50%;
-      transform: translateY(-50%);
+      left: 14px;
+      right: 14px;
+      bottom: 0;
+      border-radius: 2px 2px 0 0;
+      transition: height 0.2s ease-in-out;
     }
     &.active {
       color: var(--sideBarTitleColor);
+      background: var(--appPanel);
     }
     &.active::before {
-      height: 100%;
+      height: 3px;
     }
   }
 }

@@ -14,7 +14,8 @@
   "defaultDirectoryToOpen": "",
   "lastOpenedFolder": "",
   "treePathExcludePatterns": [],
-  "language": "en",
+  "language": "zh-CN",
+  "__uiMigrated": false,
 
   "editorFontFamily": "Open Sans",
   "fontSize": 16,
@@ -57,8 +58,8 @@
   "sequenceTheme": "hand",
   "plantumlServer": "https://www.plantuml.com/plantuml",
 
-  "theme": "light",
-  "followSystemTheme": true,
+  "theme": "dark",
+  "followSystemTheme": false,
   "lightModeTheme": "light",
   "darkModeTheme": "dark",
   "customCss": "",

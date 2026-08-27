@@ -113,7 +113,11 @@ const openFolder = () => {
       font-size: 32px;
       font-weight: 700;
       letter-spacing: -0.4px;
-      color: var(--editorColor80);
+      background: var(--brandGrad);
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+      color: transparent;
     }
 
     & .welcome-subtitle {

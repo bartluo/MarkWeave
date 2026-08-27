@@ -34,6 +34,10 @@
       <rename />
       <import-modal />
       <activation-dialog />
+      <trial-gate
+        v-if="showTrialGate"
+        @success="showTrialGate = false"
+      />
     </div>
   </div>
 </template>
@@ -54,6 +58,7 @@ import ExportSettingDialog from '@/components/exportSettings/index.vue'
 import Rename from '@/components/rename/index.vue'
 import ImportModal from '@/components/import/index.vue'
 import ActivationDialog from '@/components/license/activationDialog.vue'
+import TrialGate from '@/components/trialGate/index.vue'
 import bus from '@/bus'
 import { DEFAULT_STYLE } from '@/config'
 import { useLayoutStore } from '@/store/layout'
@@ -80,6 +85,7 @@ const licenseStore = useLicenseStore()
 const authStore = useAuthStore()
 
 const timer = ref<ReturnType<typeof setTimeout> | null>(null)
+const showTrialGate = ref(true)
 
 const { windowActive, platform, init } = storeToRefs(mainStore)
 const { showTabBar } = storeToRefs(layoutStore)
@@ -169,6 +175,18 @@ const setupDragDropHandler = (): void => {
   )
 }
 onMounted(async () => {
+  // 先注册启动事件，避免主进程的 bootstrap 消息在异步初始化完成前丢失。
+  editorStore.LISTEN_FOR_BOOTSTRAP_WINDOW()
+
+  // 首次使用：未登录时显示试用欢迎页；7 天试用 + 3 天宽限后必须网页注册。
+  try {
+    const status = await window.auth?.getStatus?.()
+    showTrialGate.value = !(status?.authenticated)
+  } catch (e) {
+    console.error('auth status check failed:', e)
+    showTrialGate.value = true
+  }
+
   // 防盗版：启动即加载许可证状态与功能标志（proExport/premiumThemes/cloudSync）
   await licenseStore.init()
   // 启动用户认证系统（本地模式无感；云模式启用账户功能）
@@ -197,7 +215,6 @@ onMounted(async () => {
   editorStore.LISTEN_FOR_MOVE_TO()
   editorStore.LISTEN_FOR_SAVE()
   editorStore.LISTEN_FOR_SET_PATHNAME()
-  editorStore.LISTEN_FOR_BOOTSTRAP_WINDOW()
   editorStore.LISTEN_FOR_SAVE_CLOSE()
   editorStore.LISTEN_FOR_RENAME()
   editorStore.LISTEN_FOR_SET_LINE_ENDING()

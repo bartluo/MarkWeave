@@ -69,7 +69,12 @@
   "language": {
     "description": "General--The language MarkWeave uses.",
     "type": "string",
-    "default": "en"
+    "default": "zh-CN"
+  },
+  "__uiMigrated": {
+    "description": "Internal--One-time migration flag for the 1.0.0 brand look.",
+    "type": "boolean",
+    "default": false
   },
   "editorFontFamily": {
     "description": "Editor--editor font family",
@@ -291,7 +296,7 @@
   "theme": {
     "description": "Theme--Select the theme used in MarkWeave",
     "type": "string",
-    "default": "light"
+    "default": "dark"
   },
   "followSystemTheme": {
     "description": "Theme--Use separate theme in dark mode.",

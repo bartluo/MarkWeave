@@ -64,7 +64,10 @@ const INVOKE_CHANNELS: ReadonlySet<string> = new Set([
   'mt::auth::create-team', 'mt::auth::get-team', 'mt::auth::invite-team-member',
   'mt::auth::accept-team-invite', 'mt::auth::get-referral', 'mt::auth::convert-referral',
   'mt::auth::get-notifications', 'mt::auth::get-unread-notification-count',
-  'mt::auth::mark-notification-read', 'mt::auth::log-analytics', 'mt::paths::is-image',
+  'mt::auth::mark-notification-read', 'mt::auth::log-analytics',
+  'mt::auth::desktop-start', 'mt::trial::get-state',
+  'mt::auth::local-status', 'mt::auth::local-register', 'mt::auth::local-login',
+  'mt::auth::local-logout', 'mt::paths::is-image',
   'mt::rg::start', 'mt::shell::open-external', 'mt::shell::open-path',
   'mt::spellchecker-get-available-dictionaries', 'mt::spellchecker-get-custom-dictionary-words',
   'mt::spellchecker-remove-word', 'mt::spellchecker-set-enabled', 'mt::spellchecker-switch-language',
@@ -84,7 +87,7 @@ const SEND_CHANNELS: ReadonlySet<string> = new Set([
   'mt::cmd-toggle-autosave', 'mt::editor-selection-changed', 'mt::format-link-click',
   'mt::get-current-language', 'mt::handle-renderer-error', 'mt::keybinding-debug-dump-keyboard-info',
   'mt::make-screenshot', 'mt::menu::popup', 'mt::menu::popup-application', 'mt::open-file',
-  'mt::open-file-by-window-id', 'mt::open-keybindings-config', 'mt::open-setting-window',
+  'mt::menu::popup-application-item', 'mt::open-file-by-window-id', 'mt::open-keybindings-config', 'mt::open-setting-window',
   'mt::rename', 'mt::request-keybindings', 'mt::set-editor-format-menus-enabled',
   'mt::response-export', 'mt::response-file-move-to', 'mt::response-file-save',
   'mt::response-file-save-as', 'mt::response-print', 'mt::rg::cancel',
@@ -222,7 +225,9 @@ const windowControlAPI = {
   popupMenu: (template: unknown, position?: { x: number; y: number }) =>
     send('mt::menu::popup', template as never, position),
   popupApplicationMenu: (position?: { x: number; y: number }) =>
-    send('mt::menu::popup-application', position)
+    send('mt::menu::popup-application', position),
+  popupApplicationMenuItem: (index: number) =>
+    send('mt::menu::popup-application-item', index)
 }
 
 // These three predicates are pure path-string operations: implementing them
@@ -393,7 +398,18 @@ const authAPI = {
   getUnreadNotificationCount: () => invoke('mt::auth::get-unread-notification-count'),
   markNotificationRead: (notificationId: string) => invoke('mt::auth::mark-notification-read', notificationId),
   logAnalytics: (eventType: string, eventData?: Record<string, unknown>) =>
-    invoke('mt::auth::log-analytics', eventType, eventData)
+    invoke('mt::auth::log-analytics', eventType, eventData),
+  localStatus: () => invoke('mt::auth::local-status'),
+  localRegister: (req: { email: string; password: string; displayName: string }) =>
+    invoke('mt::auth::local-register', req),
+  localLogin: (creds: { email: string; password: string }) =>
+    invoke('mt::auth::local-login', creds),
+  localLogout: () => invoke('mt::auth::local-logout')
+}
+
+const trialAPI = {
+  getState: () => invoke('mt::trial::get-state'),
+  startDesktopAuth: () => invoke('mt::auth::desktop-start')
 }
 
 const electronAPI = {
@@ -467,6 +483,7 @@ try {
   contextBridge.exposeInMainWorld('license', licenseAPI)
   contextBridge.exposeInMainWorld('payment', paymentAPI)
   contextBridge.exposeInMainWorld('auth', authAPI)
+  contextBridge.exposeInMainWorld('trial', trialAPI)
 } catch {
   // Exposing any API can fail only if contextIsolation is disabled; keep the
   // bridge working silently otherwise.

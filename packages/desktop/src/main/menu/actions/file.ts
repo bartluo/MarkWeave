@@ -94,10 +94,11 @@ const handleResponseForExport = async(e: IpcMainEvent, payload: ExportPayload): 
   // 防盗版：导出为 Pro 功能，未授权时在主进程强制拦截（无法通过改渲染层绕过）
   if (!getLicenseManager().hasFeature('proExport')) {
     win.webContents.send('mt::show-notification', {
-      title: 'Pro feature',
+      title: 'Pro 功能',
       type: 'warning',
-      message: 'Export is a Pro feature. Please activate your license first.'
+      message: '导出 PDF/HTML 是 Pro 版功能，请先升级激活。'
     })
+    win.webContents.send('mt::execute-command-by-id', 'file.activate-license')
     return
   }
   const extension = (EXTENSION_HASN as Record<string, string>)[type]

@@ -127,4 +127,17 @@ export const registerWindowHandlers = (): void => {
       log.error('application menu popup failed:', err)
     }
   })
+
+  ipcMain.on('mt::menu::popup-application-item', (event, index: number) => {
+    const win = windowFromEvent(event)
+    if (!win || typeof index !== 'number' || index < 0) return
+    try {
+      const appMenu = Menu.getApplicationMenu()
+      const item = appMenu?.items[index]
+      if (!item?.submenu) return
+      item.submenu.popup({ window: win })
+    } catch (err) {
+      log.error('application menu item popup failed:', err)
+    }
+  })
 }

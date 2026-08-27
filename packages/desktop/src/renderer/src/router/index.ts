@@ -5,11 +5,21 @@ import type { RouteRecordRaw } from 'vue-router'
 import App from '@/pages/app.vue'
 
 const parseSettingsPage = (type: string | null | undefined): string => {
-  let pageUrl = '/preference'
-  if (type && /\/spelling$/.test(type)) {
-    pageUrl += '/spelling'
-  }
-  return pageUrl
+  const category = type?.split('/').pop()
+  const validCategories = [
+    'account',
+    'pro',
+    'general',
+    'editor',
+    'markdown',
+    'theme',
+    'image',
+    'spelling',
+    'keybindings'
+  ]
+  return category && validCategories.includes(category)
+    ? `/preference/${category}`
+    : '/preference'
 }
 
 const createRoutes = (envType?: string): RouteRecordRaw[] => {
@@ -25,10 +35,10 @@ const createRoutes = (envType?: string): RouteRecordRaw[] => {
         const params = new URLSearchParams(window.location.search)
         const queryType = params.get('type')
         if (queryType?.includes('settings')) {
-          return `/editor${parseSettingsPage(queryType)}`
+          return parseSettingsPage(queryType)
         }
         if (envType?.includes('settings')) {
-          return `/editor${parseSettingsPage(envType)}`
+          return parseSettingsPage(envType)
         }
         return '/editor'
       }
@@ -48,6 +58,11 @@ const createRoutes = (envType?: string): RouteRecordRaw[] => {
           path: 'account',
           name: 'preference-account',
           component: () => import('@/prefComponents/account/index.vue')
+        },
+        {
+          path: 'pro',
+          name: 'preference-pro',
+          component: () => import('@/prefComponents/pro/index.vue')
         },
         {
           path: 'general',

@@ -65,9 +65,6 @@ export default function HowToUse() {
           <Link className="btn btn-primary" href="/download">
             立即下载
           </Link>
-          <Link className="btn btn-ghost" href="/docs">
-            查看详细文档
-          </Link>
         </div>
       </div>
     </section>

@@ -33,10 +33,10 @@ class SettingWindow extends BaseWindow {
         y?: number
       }
     )
-    if (isLinux) {
+    if (!isOsx) {
       winOptions.icon = path.join(
         (global as unknown as { __static: string }).__static,
-        'logo-96px.png'
+        'icon.png'
       )
     }
 

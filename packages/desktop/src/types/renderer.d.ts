@@ -24,7 +24,8 @@ import type {
   BillingCycle,
   TeamDetail,
   Notification,
-  Referral
+  Referral,
+  TrialState
 } from '@shared/types/auth'
 
 declare global {
@@ -89,6 +90,7 @@ declare global {
     isFullScreen(): Promise<boolean>
     popupMenu(template: MenuTemplate, position?: MenuPopupPosition): void
     popupApplicationMenu(position?: MenuPopupPosition): void
+    popupApplicationMenuItem(index: number): void
   }
 
   interface ElectronAPI {
@@ -223,6 +225,15 @@ declare global {
     getUnreadNotificationCount(): Promise<{ count: number }>
     markNotificationRead(notificationId: string): Promise<{ ok: boolean }>
     logAnalytics(eventType: string, eventData?: Record<string, unknown>): Promise<{ ok: boolean }>
+    localStatus(): Promise<{ registered: boolean; loggedIn: boolean; email?: string; displayName?: string }>
+    localRegister(req: { email: string; password: string; displayName: string }): Promise<{ ok: boolean; error?: string }>
+    localLogin(creds: { email: string; password: string }): Promise<{ ok: boolean; email?: string; displayName?: string; error?: string }>
+    localLogout(): Promise<{ ok: boolean }>
+  }
+
+  interface TrialAPI {
+    getState(): Promise<TrialState>
+    startDesktopAuth(): Promise<{ ok: boolean; error?: string }>
   }
 
   interface ProcessShim {
@@ -247,6 +258,7 @@ declare global {
     license: LicenseAPI
     payment: PaymentAPI
     auth: AuthAPI
+    trial: TrialAPI
     process: ProcessShim
     rgPath: string
     // Set by the legacy editor store at runtime; consumed by muya internals.

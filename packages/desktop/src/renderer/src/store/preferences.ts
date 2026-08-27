@@ -154,7 +154,7 @@ export const usePreferencesStore = defineStore('preferences', {
     defaultDirectoryToOpen: '',
     lastOpenedFolder: '',
     treePathExcludePatterns: [],
-    language: 'en',
+    language: 'zh-CN',
 
     editorFontFamily: 'Open Sans',
     fontSize: 16,
@@ -198,7 +198,7 @@ export const usePreferencesStore = defineStore('preferences', {
     sequenceTheme: 'hand',
     plantumlServer: 'https://www.plantuml.com/plantuml',
 
-    theme: 'light',
+    theme: 'dark',
     followSystemTheme: true,
     lightModeTheme: 'light',
     darkModeTheme: 'dark',

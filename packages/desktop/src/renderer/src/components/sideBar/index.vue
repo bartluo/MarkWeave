@@ -151,7 +151,8 @@ const handleLeftBottomClick = (name: string): void => {
   color: var(--sideBarColor);
   user-select: none;
   background: var(--sideBarBgColor);
-  border-right: 1px solid var(--itemBgColor);
+  border-right: 1px solid var(--appBarBorder);
+  box-shadow: 2px 0 0 color-mix(in srgb, var(--editorColor) 4%, transparent);
 }
 
 .side-bar .left-column svg {
@@ -166,6 +167,8 @@ const handleLeftBottomClick = (name: string): void => {
   justify-content: space-between;
   padding-top: 28px;
   box-sizing: border-box;
+  background: var(--appBarBg);
+  border-right: 1px solid var(--appBarBorder);
 }
 
 .left-column > ul {
@@ -206,7 +209,7 @@ const handleLeftBottomClick = (name: string): void => {
 }
 
 .left-column ul > li.active > svg {
-  color: var(--themeColor);
+  color: var(--brandA);
 }
 
 .left-column ul > li.active::before {
@@ -218,7 +221,7 @@ const handleLeftBottomClick = (name: string): void => {
   width: 3px;
   height: 18px;
   border-radius: 2px;
-  background: var(--themeColor);
+  background: var(--brandGrad);
   transition: height 0.2s ease-in-out;
 }
 
@@ -243,6 +246,6 @@ const handleLeftBottomClick = (name: string): void => {
 }
 
 .drag-bar:hover {
-  border-right: 2px solid var(--iconColor);
+  border-right: 2px solid var(--brandB);
 }
 </style>

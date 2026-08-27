@@ -17,6 +17,12 @@ services:
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
       GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID:-}
       GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET:-}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      SMTP_FROM: ${SMTP_FROM:-MarkWeave <no-reply@markweave.app>}
+      EMAIL_VERIFY_DEV_CODE: ${EMAIL_VERIFY_DEV_CODE:-}
     volumes:
       - auth-data:/app/packages/auth-server/data
 
@@ -86,8 +92,17 @@ services:
       HOSTNAME: 0.0.0.0
       PORT: 3000
       PAYMENT_API_URL: http://payment-server:3220
+      AUTH_API_URL: http://auth-server:3230
     depends_on:
       - payment-server
+
+  downloads-server:
+    image: nginx:alpine
+    restart: unless-stopped
+    ports:
+      - "172.18.0.1:13080:80"
+    volumes:
+      - ./downloads:/usr/share/nginx/html:ro
 
 volumes:
   auth-data:

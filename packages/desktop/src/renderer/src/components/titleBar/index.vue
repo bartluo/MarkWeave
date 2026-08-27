@@ -49,10 +49,16 @@
       <div :class="showCustomTitleBar ? 'left-toolbar title-no-drag' : 'right-toolbar'">
         <div
           v-if="showCustomTitleBar"
-          class="frameless-titlebar-menu title-no-drag"
-          @click.stop="handleMenuClick"
+          class="frameless-menubar title-no-drag"
         >
-          <span class="text-center-vertical">&#9776;</span>
+          <button
+            v-for="(menuItem, index) of applicationMenuItems"
+            :key="menuItem.key"
+            class="frameless-menubar-item"
+            @click.stop="handleMenuItemClick(index)"
+          >
+            {{ menuItem.label }}
+          </button>
         </div>
         <el-tooltip
           v-if="wordCount"
@@ -168,7 +174,7 @@ const props = defineProps<{
 const preferencesStore = usePreferencesStore()
 const layoutStore = useLayoutStore()
 const editorStore = useEditorStore()
-const { t } = useI18n()
+const { t, locale } = useI18n()
 
 const isOsx = isOsxPlatform
 const HASH = {
@@ -226,6 +232,22 @@ const showTitleBar = computed(() => {
   return shouldShowInAppTitleBar(titleBarStyle.value, isOsx)
 })
 
+// The top-level application menu is rendered as a horizontal toolbar in the
+// custom title bar. The order must match src/main/menu/templates/index.ts.
+const applicationMenuItems = computed(() => {
+  void locale.value
+  return [
+    { key: 'file', label: t('menu.file.file') },
+    { key: 'edit', label: t('menu.edit.edit') },
+    { key: 'paragraph', label: t('menu.paragraph.title') },
+    { key: 'format', label: t('menu.format.format') },
+    { key: 'window', label: t('menu.window.title') },
+    { key: 'theme', label: t('menu.theme.theme') },
+    { key: 'view', label: t('menu.view.view') },
+    { key: 'help', label: t('menu.help.help') }
+  ]
+})
+
 watch(
   () => props.filename,
   (value) => {
@@ -275,8 +297,8 @@ const handleMinimizeClick = () => {
   window.electron.windowControl.minimize()
 }
 
-const handleMenuClick = () => {
-  window.electron.windowControl.popupApplicationMenu({ x: 23, y: 20 })
+const handleMenuItemClick = (index: number) => {
+  window.electron.windowControl.popupApplicationMenuItem(index)
 }
 
 const rename = () => {
@@ -320,7 +342,8 @@ onBeforeUnmount(() => {
 <style scoped>
 .title-bar-editor-bg {
   height: var(--titleBarHeight);
-  background: var(--editorBgColor);
+  background: var(--appBarBg);
+  border-bottom: 1px solid var(--appBarBorder);
   position: relative;
   left: 0;
   top: 0;
@@ -350,7 +373,7 @@ img {
   vertical-align: top;
 }
 .title {
-  padding: 0 142px;
+  padding: 0 150px 0 360px;
   height: 100%;
   line-height: var(--titleBarHeight);
   font-size: 13px;
@@ -407,7 +430,7 @@ div.title > span {
   position: absolute;
   top: 0;
   left: 0;
-  width: 118px; /* + 2*10px padding*/
+  width: auto;
   display: flex;
   flex-direction: row;
 }
@@ -440,7 +463,7 @@ div.title > span {
     border-radius: 3px;
   }
   &:hover > span {
-    background: var(--sideBarBgColor);
+    background: var(--appPanelHover);
     color: var(--sideBarTitleColor);
   }
 }
@@ -464,6 +487,41 @@ div.title > span {
 }
 .frameless-titlebar-menu {
   color: var(--sideBarColor);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 46px;
+  height: 100%;
+  border-radius: 0 0 8px 0;
+  transition: background 0.2s ease-in-out;
+}
+.frameless-titlebar-menu:hover {
+  background: var(--appPanelHover);
+}
+
+.frameless-menubar {
+  display: flex;
+  align-items: center;
+  height: 100%;
+  padding-left: 8px;
+}
+
+.frameless-menubar-item {
+  height: 100%;
+  padding: 0 9px;
+  border: none;
+  background: transparent;
+  color: var(--editorColor50);
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.2s ease-in-out, color 0.2s ease-in-out;
+}
+
+.frameless-menubar-item:hover {
+  background: var(--appPanelHover);
+  color: var(--editorColor);
 }
 .frameless-titlebar-close:hover {
   background-color: rgb(228, 79, 79);
@@ -473,7 +531,7 @@ div.title > span {
   background-color: rgba(0, 0, 0, 0.1);
 }
 .frameless-titlebar-button svg {
-  fill: #000000;
+  fill: var(--editorColor80);
 }
 .frameless-titlebar-close:hover svg {
   fill: #ffffff;

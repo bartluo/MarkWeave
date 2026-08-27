@@ -3,6 +3,19 @@
   --titleBarHeight: 32px;
   --editorAreaWidth: 750px;
 
+  /* Brand palette shared with the marketing site (cyan -> blue -> teal) */
+  --brandA: #22d3ee;
+  --brandB: #3b82f6;
+  --brandC: #14b8a6;
+  --brandGrad: linear-gradient(110deg, #22d3ee 0%, #3b82f6 52%, #14b8a6 100%);
+  --brandGlow: rgba(59, 130, 246, 0.32);
+
+  /* App chrome / action surfaces — keep borders distinct from the editor */
+  --appBarBg: color-mix(in srgb, var(--editorBgColor) 84%, var(--editorColor10));
+  --appBarBorder: color-mix(in srgb, var(--editorColor) 18%, transparent);
+  --appPanel: color-mix(in srgb, var(--editorBgColor) 80%, var(--editorColor10));
+  --appPanelHover: color-mix(in srgb, var(--editorBgColor) 74%, var(--editorColor10));
+
   /*editor*/
   /*Theme color cluster*/
   --themeColor: #5b6ee1;
@@ -325,18 +338,19 @@ div.el-tab-pane {
   cursor: pointer;
   text-decoration: none;
   color: var(--buttonPrimaryFontColor);
-  background: var(--buttonPrimaryBgColor);
+  background: var(--brandGrad);
+  background-size: 160% 160%;
   border: var(--buttonPrimaryBorder);
   border-radius: 8px;
-  box-shadow: var(--buttonPrimaryShadow);
+  box-shadow: 0 6px 20px -8px var(--brandGlow), 0 1px 0 rgba(255, 255, 255, 0.18) inset;
   padding: 7px 14px;
-  transition: background-color 0.15s ease, box-shadow 0.15s ease;
+  transition: background-color 0.15s ease, background-position 0.25s ease, box-shadow 0.15s ease;
 }
 .button-primary:hover,
 .muya-button-primary:hover,
 .el-button--primary:hover {
   color: var(--buttonPrimaryFontColorHover);
-  background: var(--buttonPrimaryBgColorHover);
+  background-position: 100% 0;
   border: var(--buttonPrimaryBorderHover);
 }
 .button-primary:active,

@@ -50,6 +50,17 @@ class Preference extends TypedEmitter<PreferenceEvents> {
           if (store.get('startUpAction') === 'lastState') {
             store.set('startUpAction', 'openLastFolder')
           }
+        },
+        // 1.0.0 brings the marketing-site look to the desktop app. Existing
+        // installs defaulted to the old light theme, which masked the new
+        // chrome/panel styling — switch them to the dark brand theme once.
+        '1.0.0': (store) => {
+          if (store.get('theme') === 'light') {
+            store.set('theme', 'dark')
+          }
+          if (store.get('followSystemTheme')) {
+            store.set('followSystemTheme', false)
+          }
         }
       },
       beforeEachMigration: (_store, context) => {
@@ -62,6 +73,21 @@ class Preference extends TypedEmitter<PreferenceEvents> {
   }
 
   init = (): void => {
+    // One-time 1.0.0 migration: existing installs that never picked a theme or
+    // language keep the old light/English defaults, which hid the new brand UI.
+    if (!this.store.get('__uiMigrated')) {
+      if (this.store.get('theme') === 'light') {
+        this.store.set('theme', 'dark')
+      }
+      if (this.store.get('language') === 'en') {
+        this.store.set('language', 'zh-CN')
+      }
+      if (this.store.get('followSystemTheme')) {
+        this.store.set('followSystemTheme', false)
+      }
+      this.store.set('__uiMigrated', true)
+    }
+
     let defaultSettings: Record<string, unknown> | null = null
     try {
       defaultSettings = JSON.parse(fs.readFileSync(this.staticPath, { encoding: 'utf8' }) || '{}')
@@ -71,13 +97,6 @@ class Preference extends TypedEmitter<PreferenceEvents> {
         defaultSettings!.theme = 'dark'
       }
 
-      // Set system language on first application start
-      if (!this.hasPreferencesFile) {
-        const systemLanguage = this._getSystemLanguage()
-        if (systemLanguage) {
-          defaultSettings!.language = systemLanguage
-        }
-      }
     } catch (err) {
       log.error(err)
     }

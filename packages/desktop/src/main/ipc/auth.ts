@@ -1,5 +1,6 @@
-import { ipcMain } from 'electron'
+import { BrowserWindow, ipcMain } from 'electron'
 import { getAuthManager } from '../auth'
+import { getTrialStore } from '../auth/trial'
 import type { LoginCredentials, RegisterRequest, BillingCycle } from '@shared/types/auth'
 
 export const registerAuthHandlers = (): void => {
@@ -16,6 +17,14 @@ export const registerAuthHandlers = (): void => {
 
   ipcMain.handle('mt::auth::logout', () => {
     return getAuthManager().logout()
+  })
+
+  ipcMain.handle('mt::auth::desktop-start', (event) => {
+    return getAuthManager().startDesktopAuth(BrowserWindow.fromWebContents(event.sender))
+  })
+
+  ipcMain.handle('mt::trial::get-state', () => {
+    return getTrialStore().getState()
   })
 
   ipcMain.handle('mt::auth::refresh-token', () => {
@@ -111,5 +120,22 @@ export const registerAuthHandlers = (): void => {
 
   ipcMain.handle('mt::auth::log-analytics', (_e, eventType: string, eventData?: Record<string, unknown>) => {
     return getAuthManager().logAnalytics(eventType, eventData)
+  })
+
+  // ── 本地账号（首次使用注册门槛） ─────────────────────────────────────────────
+  ipcMain.handle('mt::auth::local-status', () => {
+    return getAuthManager().getLocalStatus()
+  })
+
+  ipcMain.handle('mt::auth::local-register', (_e, req: RegisterRequest) => {
+    return getAuthManager().localRegister(req)
+  })
+
+  ipcMain.handle('mt::auth::local-login', (_e, creds: LoginCredentials) => {
+    return getAuthManager().localLogin(creds)
+  })
+
+  ipcMain.handle('mt::auth::local-logout', () => {
+    return getAuthManager().localLogout()
   })
 }

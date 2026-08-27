@@ -141,6 +141,16 @@ class TokenStore {
     } catch (err) {
       log.warn('keytar restore failed:', err)
     }
+    // Keytar may be unavailable in some dev/sandbox environments. Tokens are
+    // already held in memory by saveTokens(), so still restore the in-memory
+    // session for the current process instead of forcing a re-login.
+    if (this.accessToken && this.refreshToken) {
+      const expiresAt = this.store.get('expiresAt')
+      if (!expiresAt || expiresAt <= Date.now()) {
+        this.store.set('expiresAt', 0)
+      }
+      return true
+    }
     return false
   }
 }

@@ -46,7 +46,8 @@ import type {
   BillingCycle,
   TeamDetail,
   Notification,
-  Referral
+  Referral,
+  TrialState
 } from './auth'
 
 // =================================================================
@@ -106,6 +107,10 @@ export interface IpcInvokeChannels {
   'mt::auth::migrate-license': { args: [licenseKey: string]; ret: { ok: boolean; error?: string } }
   'mt::auth::start-oauth': { args: [provider: 'google' | 'github']; ret: OAuthChallenge }
   'mt::auth::oauth-callback': { args: [code: string, state: string, provider: 'google' | 'github']; ret: AuthResult }
+  'mt::auth::local-status': { args: []; ret: { registered: boolean; loggedIn: boolean; email?: string; displayName?: string } }
+  'mt::auth::local-register': { args: [req: RegisterRequest]; ret: { ok: boolean; error?: string } }
+  'mt::auth::local-login': { args: [creds: LoginCredentials]; ret: { ok: boolean; email?: string; displayName?: string; error?: string } }
+  'mt::auth::local-logout': { args: []; ret: { ok: boolean } }
   // ---- Business channels ----
   'mt::auth::get-subscription': { args: []; ret: UserSubscription | null }
   'mt::auth::create-subscription': { args: [planId: string, billingCycle: import('./auth').BillingCycle, couponCode?: string]; ret: { ok: boolean; subscriptionId?: string; planType?: string } }
@@ -120,6 +125,8 @@ export interface IpcInvokeChannels {
   'mt::auth::get-unread-notification-count': { args: []; ret: { count: number } }
   'mt::auth::mark-notification-read': { args: [notificationId: string]; ret: { ok: boolean } }
   'mt::auth::log-analytics': { args: [eventType: string, eventData?: Record<string, unknown>]; ret: { ok: boolean } }
+  'mt::auth::desktop-start': { args: []; ret: { ok: boolean; error?: string } }
+  'mt::trial::get-state': { args: []; ret: TrialState }
   'mt::paths::is-image': { args: [path: string]; ret: boolean }
   'mt::rg::start': { args: [req: unknown]; ret: { searchId: string } }
   'mt::shell::open-external': { args: [url: string]; ret: void }
@@ -178,6 +185,7 @@ export interface IpcSendChannels {
   'mt::make-screenshot': []
   'mt::menu::popup': [template: MenuTemplate, position?: MenuPopupPosition]
   'mt::menu::popup-application': [position?: MenuPopupPosition]
+  'mt::menu::popup-application-item': [index: number]
   'mt::open-file': [filePath: string, options?: unknown]
   'mt::open-file-by-window-id': [windowId: number, filePath: string, options?: unknown]
   'mt::open-keybindings-config': []

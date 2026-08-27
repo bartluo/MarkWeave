@@ -14,6 +14,7 @@ import type { LicenseState, ActivateResult } from '@shared/types/license'
 import type { CheckoutOutcome, OrderInfo, PaymentPlanInfo } from '@shared/types/payment'
 import type { MenuTemplate, MenuPopupPosition } from '@shared/types/menu'
 import type { SerializedStat } from '@shared/types/files'
+import type { TrialState } from '@shared/types/auth'
 
 declare global {
   // ---- Build-time defines (electron-vite `define`) ----
@@ -77,6 +78,7 @@ declare global {
     isFullScreen(): Promise<boolean>
     popupMenu(template: MenuTemplate, position?: MenuPopupPosition): void
     popupApplicationMenu(position?: MenuPopupPosition): void
+    popupApplicationMenuItem(index: number): void
   }
 
   interface ElectronAPI {
@@ -182,6 +184,11 @@ declare global {
     getOrder(orderId: string): Promise<OrderInfo | null>
   }
 
+  interface TrialAPI {
+    getState(): Promise<TrialState>
+    startDesktopAuth(): Promise<{ ok: boolean; error?: string }>
+  }
+
   interface ProcessShim {
     platform: NodeJS.Platform
     arch?: string
@@ -203,6 +210,7 @@ declare global {
     fonts: FontsAPI
     license: LicenseAPI
     payment: PaymentAPI
+    trial: TrialAPI
     process: ProcessShim
     rgPath: string
     // Set by the legacy editor store at runtime; consumed by muya internals.
