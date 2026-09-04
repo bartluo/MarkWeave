@@ -2,13 +2,7 @@ import { shell, ipcMain } from 'electron'
 import log from 'electron-log'
 import EventEmitter from 'events'
 import fsPromises from 'fs/promises'
-import {
-  getCurrentKeyboardLayout,
-  getKeyMap,
-  onDidChangeKeyboardLayout,
-  type IKeyboardLayoutInfo,
-  type IKeyboardMapping
-} from 'native-keymap'
+import type { IKeyboardLayoutInfo, IKeyboardMapping } from 'native-keymap'
 import os from 'os'
 import path from 'path'
 
@@ -19,18 +13,36 @@ export interface KeyboardInfo {
 
 type KeyboardInfoListener = (info: KeyboardInfo) => void
 
+interface NativeKeymapModule {
+  getCurrentKeyboardLayout(): IKeyboardLayoutInfo
+  getKeyMap(): IKeyboardMapping
+  onDidChangeKeyboardLayout(callback: (layout: IKeyboardLayoutInfo) => void): void
+}
+
 let currentKeyboardInfo: KeyboardInfo | null = null
-const loadKeyboardInfo = (): KeyboardInfo => {
+let nativeKeymapModule: NativeKeymapModule | null | undefined
+
+const loadNativeKeymap = (): NativeKeymapModule | null => {
+  if (nativeKeymapModule !== undefined) return nativeKeymapModule
   try {
-    currentKeyboardInfo = {
-      layout: getCurrentKeyboardLayout(),
-      keymap: getKeyMap()
-    }
+    // Loaded lazily: the optional native module may be absent in packaged or
+    // un-rebuilt dev environments, so a top-level require must be avoided.
+    nativeKeymapModule = require('native-keymap') as NativeKeymapModule
   } catch (err) {
-    // native-keymap is optional in some dev environments (no native build).
-    // Fall back to a US layout so the app can still start; keyboard layout
-    // detection simply stays at the default.
     log.warn('native-keymap unavailable, using fallback keyboard layout:', err)
+    nativeKeymapModule = null
+  }
+  return nativeKeymapModule
+}
+
+const loadKeyboardInfo = (): KeyboardInfo => {
+  const nativeKeymap = loadNativeKeymap()
+  if (nativeKeymap) {
+    currentKeyboardInfo = {
+      layout: nativeKeymap.getCurrentKeyboardLayout(),
+      keymap: nativeKeymap.getKeyMap()
+    }
+  } else {
     currentKeyboardInfo = {
       layout: { id: 'fallback', layout: 'US' } as unknown as IKeyboardLayoutInfo,
       keymap: {}
@@ -78,19 +90,24 @@ class KeyboardLayoutMonitor extends EventEmitter {
   _ensureNativeListener(): void {
     if (!this._isSubscribed) {
       this._isSubscribed = true
-      try {
-        onDidChangeKeyboardLayout(() => {
-          // The keyboard layout change event may be emitted multiple times.
-          if (this._emitTimer) {
-            clearTimeout(this._emitTimer)
-          }
-          this._emitTimer = setTimeout(() => {
-            this.emit(KEYBOARD_LAYOUT_MONITOR_CHANNEL_ID, loadKeyboardInfo())
-            this._emitTimer = null
-          }, 150)
-        })
-      } catch (err) {
-        log.warn('keyboard layout monitoring unavailable:', err)
+      const nativeKeymap = loadNativeKeymap()
+      if (nativeKeymap) {
+        try {
+          nativeKeymap.onDidChangeKeyboardLayout(() => {
+            // The keyboard layout change event may be emitted multiple times.
+            if (this._emitTimer) {
+              clearTimeout(this._emitTimer)
+            }
+            this._emitTimer = setTimeout(() => {
+              this.emit(KEYBOARD_LAYOUT_MONITOR_CHANNEL_ID, loadKeyboardInfo())
+              this._emitTimer = null
+            }, 150)
+          })
+        } catch (err) {
+          log.warn('keyboard layout monitoring unavailable:', err)
+        }
+      } else {
+        log.warn('keyboard layout monitoring unavailable: native-keymap missing')
       }
     }
   }
