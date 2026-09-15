@@ -177,6 +177,8 @@ const setupDragDropHandler = (): void => {
 onMounted(async () => {
   // 先注册启动事件，避免主进程的 bootstrap 消息在异步初始化完成前丢失。
   editorStore.LISTEN_FOR_BOOTSTRAP_WINDOW()
+  editorStore.LISTEN_FOR_NEW_TAB()
+  editorStore.LISTEN_FOR_STATE_REPLACE()
 
   // 首次使用：未登录时显示试用欢迎页；7 天试用 + 3 天宽限后必须网页注册。
   try {
@@ -220,7 +222,6 @@ onMounted(async () => {
   editorStore.LISTEN_FOR_SET_LINE_ENDING()
   editorStore.LISTEN_FOR_SET_ENCODING()
   editorStore.LISTEN_FOR_SET_FINAL_NEWLINE()
-  editorStore.LISTEN_FOR_NEW_TAB()
   editorStore.LISTEN_FOR_CLOSE_TAB()
   editorStore.LISTEN_FOR_TAB_CYCLE()
   editorStore.LISTEN_FOR_SWITCH_TABS()
@@ -230,7 +231,6 @@ onMounted(async () => {
   editorStore.LISTEN_WINDOW_ZOOM()
   editorStore.LISTEN_FOR_RELOAD_IMAGES()
   editorStore.LISTEN_FOR_CONTEXT_MENU()
-  editorStore.LISTEN_FOR_STATE_REPLACE()
 
   // module: notification
   notificationStore.listenForNotification()
